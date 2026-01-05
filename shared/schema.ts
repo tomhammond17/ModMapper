@@ -1,18 +1,64 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+export const modbusDataTypes = [
+  "INT16",
+  "UINT16",
+  "INT32",
+  "UINT32",
+  "FLOAT32",
+  "FLOAT64",
+  "STRING",
+  "BOOL",
+  "COIL",
+] as const;
+
+export type ModbusDataType = (typeof modbusDataTypes)[number];
+
+export const modbusRegisterSchema = z.object({
+  address: z.number().int().positive(),
+  name: z.string().min(1),
+  datatype: z.enum(modbusDataTypes),
+  description: z.string(),
+  writable: z.boolean(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export type ModbusRegister = z.infer<typeof modbusRegisterSchema>;
+
+export const modbusFileFormats = ["csv", "xml", "json"] as const;
+export type ModbusFileFormat = (typeof modbusFileFormats)[number];
+
+export const insertModbusDocumentSchema = z.object({
+  filename: z.string().min(1),
+  sourceFormat: z.enum(modbusFileFormats),
+  registers: z.array(modbusRegisterSchema),
 });
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+export type InsertModbusDocument = z.infer<typeof insertModbusDocumentSchema>;
+
+export interface ModbusDocument {
+  id: string;
+  filename: string;
+  sourceFormat: ModbusFileFormat;
+  registers: ModbusRegister[];
+  createdAt: Date;
+}
+
+export interface ConversionResult {
+  success: boolean;
+  message: string;
+  registers: ModbusRegister[];
+  sourceFormat: ModbusFileFormat;
+  filename: string;
+}
+
+export interface ValidationError {
+  row: number;
+  field: string;
+  message: string;
+}
+
+export interface ConversionRequest {
+  registers: ModbusRegister[];
+  targetFormat: ModbusFileFormat;
+  filename: string;
+}

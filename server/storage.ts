@@ -1,37 +1,48 @@
-import { type User, type InsertUser } from "@shared/schema";
 import { randomUUID } from "crypto";
-
-// modify the interface with any CRUD methods
-// you might need
+import type {
+  ModbusDocument,
+  ModbusRegister,
+  InsertModbusDocument,
+  ModbusFileFormat,
+} from "@shared/schema";
 
 export interface IStorage {
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  createDocument(doc: InsertModbusDocument): Promise<ModbusDocument>;
+  getDocument(id: string): Promise<ModbusDocument | undefined>;
+  getAllDocuments(): Promise<ModbusDocument[]>;
+  deleteDocument(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
-  private users: Map<string, User>;
+  private documents: Map<string, ModbusDocument>;
 
   constructor() {
-    this.users = new Map();
+    this.documents = new Map();
   }
 
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+  async createDocument(doc: InsertModbusDocument): Promise<ModbusDocument> {
+    const id = randomUUID();
+    const document: ModbusDocument = {
+      ...doc,
+      id,
+      createdAt: new Date(),
+    };
+    this.documents.set(id, document);
+    return document;
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
+  async getDocument(id: string): Promise<ModbusDocument | undefined> {
+    return this.documents.get(id);
+  }
+
+  async getAllDocuments(): Promise<ModbusDocument[]> {
+    return Array.from(this.documents.values()).sort(
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
     );
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+  async deleteDocument(id: string): Promise<boolean> {
+    return this.documents.delete(id);
   }
 }
 
