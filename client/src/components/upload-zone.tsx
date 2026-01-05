@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, useRef } from "react";
 import { Upload, FileCheck, X, FileText, FileCode, File, FileType } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +50,13 @@ export function UploadZone({
   onClear,
 }: UploadZoneProps) {
   const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleButtonClick = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    fileInputRef.current?.click();
+  }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -102,10 +109,11 @@ export function UploadZone({
       data-testid="upload-zone"
     >
       <input
+        ref={fileInputRef}
         type="file"
         accept=".csv,.xml,.json,.pdf"
         onChange={handleFileInput}
-        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        className="hidden"
         disabled={isProcessing}
         data-testid="input-file-upload"
       />
@@ -165,7 +173,12 @@ export function UploadZone({
               Supports CSV, XML, JSON, and PDF formats
             </p>
           </div>
-          <Button variant="default" size="default" data-testid="button-browse">
+          <Button 
+            variant="default" 
+            size="default" 
+            onClick={handleButtonClick}
+            data-testid="button-browse"
+          >
             <Upload className="h-4 w-4 mr-2" />
             Select File
           </Button>
