@@ -17,10 +17,12 @@ export interface PdfParseProgress {
 
 export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   try {
-    // Dynamic import for pdf-parse - uses PDFParse named export
+    // Dynamic import for pdf-parse v2 - PDFParse is a class that takes data in constructor
     const { PDFParse } = await import("pdf-parse");
-    const data = await PDFParse(buffer);
-    return data.text;
+    const parser = new PDFParse({ data: buffer });
+    const result = await parser.getText();
+    await parser.destroy();
+    return result.text;
   } catch (error) {
     throw new Error(`Failed to extract text from PDF: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
