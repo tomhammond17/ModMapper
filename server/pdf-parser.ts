@@ -17,13 +17,9 @@ export interface PdfParseProgress {
 
 export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   try {
-    // Dynamic import for pdf-parse (CommonJS module)
-    const pdfParseModule = await import("pdf-parse");
-    // Handle both ESM default export and CommonJS module.exports
-    const pdfParse = typeof pdfParseModule.default === "function" 
-      ? pdfParseModule.default 
-      : pdfParseModule;
-    const data = await pdfParse(buffer);
+    // Dynamic import for pdf-parse - uses PDFParse named export
+    const { PDFParse } = await import("pdf-parse");
+    const data = await PDFParse(buffer);
     return data.text;
   } catch (error) {
     throw new Error(`Failed to extract text from PDF: ${error instanceof Error ? error.message : "Unknown error"}`);
