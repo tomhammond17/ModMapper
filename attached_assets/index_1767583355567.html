@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modbus Manual Parser</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                            950: '#020617'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+
+        /* Drag and drop styles */
+        .drop-zone {
+            transition: all 0.3s ease;
+        }
+        .drop-zone.dragover {
+            border-color: #3b82f6;
+            background-color: rgba(59, 130, 246, 0.1);
+            transform: scale(1.02);
+        }
+
+        /* Spinner animation */
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .spinner {
+            animation: spin 1s linear infinite;
+        }
+
+        /* Editable cell styles */
+        .editable-cell {
+            cursor: text;
+            transition: background-color 0.2s;
+        }
+        .editable-cell:hover {
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+        .editable-cell:focus {
+            outline: 2px solid #3b82f6;
+            outline-offset: -2px;
+            background-color: rgba(59, 130, 246, 0.15);
+        }
+
+        /* Table row hover */
+        .data-row:hover {
+            background-color: rgba(255, 255, 255, 0.03);
+        }
+
+        /* Fade in animation */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease forwards;
+        }
+
+        /* Toast notification */
+        .toast {
+            animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s forwards;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+    </style>
+</head>
+<body class="bg-dark-950 text-dark-100 min-h-screen">
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+    <!-- Main Container -->
+    <div class="container mx-auto px-4 py-8 max-w-7xl">
+        <!-- Header -->
+        <header class="text-center mb-10">
+            <div class="flex items-center justify-center gap-3 mb-3">
+                <svg class="w-10 h-10 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/>
+                </svg>
+                <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+                    Modbus Manual Parser
+                </h1>
+            </div>
+            <p class="text-dark-400 max-w-2xl mx-auto">
+                Upload a PDF technical manual to extract and standardize Modbus register tables. 
+                Edit the extracted data and download as JSON or CSV.
+            </p>
+        </header>
+
+        <!-- Upload Section -->
+        <section id="upload-section" class="mb-8">
+            <div id="drop-zone" 
+                 class="drop-zone border-2 border-dashed border-dark-600 rounded-xl p-12 text-center 
+                        bg-dark-900/50 hover:border-dark-500 cursor-pointer transition-all">
+                <input type="file" id="file-input" accept=".pdf" class="hidden">
+                
+                <div id="upload-content">
+                    <svg class="w-16 h-16 mx-auto mb-4 text-dark-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" 
+                              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+                    <p class="text-lg font-medium text-dark-300 mb-2">
+                        Drag & drop your PDF here
+                    </p>
+                    <p class="text-dark-500 mb-4">or click to browse</p>
+                    <span class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 
+                                 text-white rounded-lg font-medium transition-colors">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                        </svg>
+                        Select PDF
+                    </span>
+                </div>
+
+                <!-- File Selected State -->
+                <div id="file-selected" class="hidden">
+                    <svg class="w-16 h-16 mx-auto mb-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" 
+                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    <p id="file-name" class="text-lg font-medium text-dark-200 mb-1"></p>
+                    <p id="file-size" class="text-dark-500 mb-4"></p>
+                    <button id="parse-btn" 
+                            class="inline-flex items-center px-6 py-3 bg-green-600 hover:bg-green-700 
+                                   text-white rounded-lg font-medium transition-colors">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                        Extract Registers
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Processing Spinner -->
+        <section id="processing-section" class="hidden mb-8">
+            <div class="bg-dark-900/50 border border-dark-700 rounded-xl p-12 text-center">
+                <svg class="w-16 h-16 mx-auto mb-4 text-blue-500 spinner" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                <p class="text-xl font-medium text-dark-200 mb-2">Processing your document...</p>
+                <p class="text-dark-500">Extracting text and analyzing register tables with AI</p>
+                <div class="mt-6 flex justify-center gap-2">
+                    <span class="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style="animation-delay: 0s"></span>
+                    <span class="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style="animation-delay: 0.2s"></span>
+                    <span class="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style="animation-delay: 0.4s"></span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Results Section -->
+        <section id="results-section" class="hidden fade-in">
+            <!-- Results Header -->
+            <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+                <div>
+                    <h2 class="text-xl font-semibold text-dark-100">Extracted Registers</h2>
+                    <p id="results-count" class="text-dark-400"></p>
+                </div>
+                <div class="flex gap-3">
+                    <button id="add-row-btn" 
+                            class="inline-flex items-center px-4 py-2 bg-dark-700 hover:bg-dark-600 
+                                   text-dark-200 rounded-lg font-medium transition-colors border border-dark-600">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        Add Row
+                    </button>
+                    <button id="download-json-btn" 
+                            class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 
+                                   text-white rounded-lg font-medium transition-colors">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                        Download JSON
+                    </button>
+                    <button id="download-csv-btn" 
+                            class="inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 
+                                   text-white rounded-lg font-medium transition-colors">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                        Download CSV
+                    </button>
+                </div>
+            </div>
+
+            <!-- Results Table -->
+            <div class="bg-dark-900/50 border border-dark-700 rounded-xl overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-dark-800 border-b border-dark-700">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-dark-300 uppercase tracking-wider w-24">
+                                    Address
+                                </th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-dark-300 uppercase tracking-wider w-40">
+                                    Name
+                                </th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-dark-300 uppercase tracking-wider w-28">
+                                    Data Type
+                                </th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-dark-300 uppercase tracking-wider">
+                                    Description
+                                </th>
+                                <th class="px-4 py-3 text-center text-xs font-semibold text-dark-300 uppercase tracking-wider w-24">
+                                    Writable
+                                </th>
+                                <th class="px-4 py-3 text-center text-xs font-semibold text-dark-300 uppercase tracking-wider w-20">
+                                    Actions
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-table-body" class="divide-y divide-dark-800">
+                            <!-- Rows will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- New Upload Button -->
+            <div class="mt-6 text-center">
+                <button id="new-upload-btn" 
+                        class="inline-flex items-center px-4 py-2 text-dark-400 hover:text-dark-200 
+                               transition-colors">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    Parse Another Document
+                </button>
+            </div>
+        </section>
+
+        <!-- Error Section -->
+        <section id="error-section" class="hidden fade-in">
+            <div class="bg-red-900/20 border border-red-800 rounded-xl p-8 text-center">
+                <svg class="w-16 h-16 mx-auto mb-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" 
+                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+                <p class="text-xl font-medium text-red-400 mb-2">Processing Failed</p>
+                <p id="error-message" class="text-dark-400 mb-6"></p>
+                <button id="retry-btn" 
+                        class="inline-flex items-center px-6 py-3 bg-dark-700 hover:bg-dark-600 
+                               text-dark-200 rounded-lg font-medium transition-colors">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    Try Again
+                </button>
+            </div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    <footer class="text-center py-6 text-dark-500 text-sm">
+        <p>Modbus Manual Parser &bull; Standardizes register tables to 40xxx format</p>
+    </footer>
+
+    <script>
+        // =====================================================================
+        // State Management
+        // =====================================================================
+        let registers = [];
+        let selectedFile = null;
+
+        // =====================================================================
+        // DOM Elements
+        // =====================================================================
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const uploadContent = document.getElementById('upload-content');
+        const fileSelected = document.getElementById('file-selected');
+        const fileName = document.getElementById('file-name');
+        const fileSize = document.getElementById('file-size');
+        const parseBtn = document.getElementById('parse-btn');
+        const uploadSection = document.getElementById('upload-section');
+        const processingSection = document.getElementById('processing-section');
+        const resultsSection = document.getElementById('results-section');
+        const errorSection = document.getElementById('error-section');
+        const resultsCount = document.getElementById('results-count');
+        const resultsTableBody = document.getElementById('results-table-body');
+        const downloadJsonBtn = document.getElementById('download-json-btn');
+        const downloadCsvBtn = document.getElementById('download-csv-btn');
+        const addRowBtn = document.getElementById('add-row-btn');
+        const newUploadBtn = document.getElementById('new-upload-btn');
+        const retryBtn = document.getElementById('retry-btn');
+        const errorMessage = document.getElementById('error-message');
+        const toastContainer = document.getElementById('toast-container');
+
+        // =====================================================================
+        // Utility Functions
+        // =====================================================================
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' bytes';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            const bgColor = type === 'success' ? 'bg-green-600' : type === 'error' ? 'bg-red-600' : 'bg-blue-600';
+            toast.className = `toast ${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2`;
+            
+            const icon = type === 'success' 
+                ? '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>'
+                : '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+            
+            toast.innerHTML = `${icon}<span>${message}</span>`;
+            toastContainer.appendChild(toast);
+            
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        function showSection(section) {
+            [uploadSection, processingSection, resultsSection, errorSection].forEach(s => {
+                s.classList.add('hidden');
+            });
+            section.classList.remove('hidden');
+        }
+
+        // =====================================================================
+        // File Handling
+        // =====================================================================
+        function handleFile(file) {
+            if (!file) return;
+            
+            if (!file.name.toLowerCase().endsWith('.pdf')) {
+                showToast('Please select a PDF file', 'error');
+                return;
+            }
+
+            selectedFile = file;
+            fileName.textContent = file.name;
+            fileSize.textContent = formatFileSize(file.size);
+            uploadContent.classList.add('hidden');
+            fileSelected.classList.remove('hidden');
+        }
+
+        function resetUpload() {
+            selectedFile = null;
+            fileInput.value = '';
+            uploadContent.classList.remove('hidden');
+            fileSelected.classList.add('hidden');
+            showSection(uploadSection);
+        }
+
+        // =====================================================================
+        // Drag and Drop
+        // =====================================================================
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            handleFile(file);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFile(e.target.files[0]);
+        });
+
+        // =====================================================================
+        // Table Rendering
+        // =====================================================================
+        function renderTable() {
+            resultsTableBody.innerHTML = '';
+            resultsCount.textContent = `${registers.length} register${registers.length !== 1 ? 's' : ''} found`;
+
+            registers.forEach((reg, index) => {
+                const row = document.createElement('tr');
+                row.className = 'data-row';
+                row.innerHTML = `
+                    <td class="px-4 py-3">
+                        <input type="number" 
+                               class="editable-cell w-full bg-transparent text-dark-200 rounded px-2 py-1 border border-transparent focus:border-blue-500"
+                               value="${reg.address}" 
+                               data-index="${index}" 
+                               data-field="address">
+                    </td>
+                    <td class="px-4 py-3">
+                        <input type="text" 
+                               class="editable-cell w-full bg-transparent text-dark-200 rounded px-2 py-1 border border-transparent focus:border-blue-500"
+                               value="${escapeHtml(reg.name)}" 
+                               data-index="${index}" 
+                               data-field="name">
+                    </td>
+                    <td class="px-4 py-3">
+                        <select class="editable-cell w-full bg-dark-800 text-dark-200 rounded px-2 py-1 border border-dark-600 focus:border-blue-500"
+                                data-index="${index}" 
+                                data-field="datatype">
+                            <option value="INT16" ${reg.datatype === 'INT16' ? 'selected' : ''}>INT16</option>
+                            <option value="UINT16" ${reg.datatype === 'UINT16' ? 'selected' : ''}>UINT16</option>
+                            <option value="INT32" ${reg.datatype === 'INT32' ? 'selected' : ''}>INT32</option>
+                            <option value="UINT32" ${reg.datatype === 'UINT32' ? 'selected' : ''}>UINT32</option>
+                            <option value="FLOAT32" ${reg.datatype === 'FLOAT32' ? 'selected' : ''}>FLOAT32</option>
+                            <option value="FLOAT64" ${reg.datatype === 'FLOAT64' ? 'selected' : ''}>FLOAT64</option>
+                            <option value="STRING" ${reg.datatype === 'STRING' ? 'selected' : ''}>STRING</option>
+                            <option value="BOOL" ${reg.datatype === 'BOOL' ? 'selected' : ''}>BOOL</option>
+                            <option value="COIL" ${reg.datatype === 'COIL' ? 'selected' : ''}>COIL</option>
+                        </select>
+                    </td>
+                    <td class="px-4 py-3">
+                        <input type="text" 
+                               class="editable-cell w-full bg-transparent text-dark-300 rounded px-2 py-1 border border-transparent focus:border-blue-500"
+                               value="${escapeHtml(reg.description)}" 
+                               data-index="${index}" 
+                               data-field="description">
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <button class="writable-toggle w-12 h-6 rounded-full transition-colors ${reg.writable ? 'bg-green-600' : 'bg-dark-600'}"
+                                data-index="${index}">
+                            <span class="block w-5 h-5 bg-white rounded-full shadow transform transition-transform ${reg.writable ? 'translate-x-6' : 'translate-x-0.5'}"></span>
+                        </button>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <button class="delete-row-btn text-dark-500 hover:text-red-500 transition-colors p-1"
+                                data-index="${index}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                        </button>
+                    </td>
+                `;
+                resultsTableBody.appendChild(row);
+            });
+
+            // Add event listeners for editing
+            document.querySelectorAll('.editable-cell').forEach(cell => {
+                cell.addEventListener('change', handleCellEdit);
+            });
+
+            document.querySelectorAll('.writable-toggle').forEach(btn => {
+                btn.addEventListener('click', handleWritableToggle);
+            });
+
+            document.querySelectorAll('.delete-row-btn').forEach(btn => {
+                btn.addEventListener('click', handleDeleteRow);
+            });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML.replace(/"/g, '&quot;');
+        }
+
+        function handleCellEdit(e) {
+            const index = parseInt(e.target.dataset.index);
+            const field = e.target.dataset.field;
+            let value = e.target.value;
+
+            if (field === 'address') {
+                value = parseInt(value) || 0;
+            }
+
+            registers[index][field] = value;
+            showToast('Value updated', 'info');
+        }
+
+        function handleWritableToggle(e) {
+            const btn = e.currentTarget;
+            const index = parseInt(btn.dataset.index);
+            registers[index].writable = !registers[index].writable;
+            renderTable();
+            showToast('Writable status toggled', 'info');
+        }
+
+        function handleDeleteRow(e) {
+            const index = parseInt(e.currentTarget.dataset.index);
+            registers.splice(index, 1);
+            renderTable();
+            showToast('Row deleted', 'info');
+        }
+
+        // =====================================================================
+        // API Call
+        // =====================================================================
+        async function parseDocument() {
+            if (!selectedFile) return;
+
+            showSection(processingSection);
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            try {
+                const response = await fetch('/parse', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    registers = data.registers;
+                    renderTable();
+                    showSection(resultsSection);
+                    showToast(data.message, 'success');
+                } else {
+                    errorMessage.textContent = data.detail || data.message || 'An unknown error occurred';
+                    showSection(errorSection);
+                }
+            } catch (error) {
+                errorMessage.textContent = 'Network error: Could not connect to the server';
+                showSection(errorSection);
+            }
+        }
+
+        // =====================================================================
+        // Download Functions
+        // =====================================================================
+        function downloadJSON() {
+            const data = { registers: registers };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            downloadBlob(blob, 'modbus_registers.json');
+            showToast('JSON downloaded', 'success');
+        }
+
+        function downloadCSV() {
+            const headers = ['address', 'name', 'datatype', 'description', 'writable'];
+            const rows = registers.map(reg => {
+                return headers.map(h => {
+                    let val = reg[h];
+                    if (typeof val === 'string' && (val.includes(',') || val.includes('"') || val.includes('\n'))) {
+                        val = '"' + val.replace(/"/g, '""') + '"';
+                    }
+                    return val;
+                }).join(',');
+            });
+            const csv = [headers.join(','), ...rows].join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            downloadBlob(blob, 'modbus_registers.csv');
+            showToast('CSV downloaded', 'success');
+        }
+
+        function downloadBlob(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // =====================================================================
+        // Add Row
+        // =====================================================================
+        function addNewRow() {
+            const newAddress = registers.length > 0 
+                ? Math.max(...registers.map(r => r.address)) + 1 
+                : 40001;
+            
+            registers.push({
+                address: newAddress,
+                name: 'NEW_REGISTER',
+                datatype: 'UINT16',
+                description: 'New register',
+                writable: false
+            });
+            
+            renderTable();
+            showToast('New row added', 'success');
+            
+            // Scroll to bottom of table
+            resultsTableBody.lastElementChild?.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // =====================================================================
+        // Event Listeners
+        // =====================================================================
+        parseBtn.addEventListener('click', parseDocument);
+        downloadJsonBtn.addEventListener('click', downloadJSON);
+        downloadCsvBtn.addEventListener('click', downloadCSV);
+        addRowBtn.addEventListener('click', addNewRow);
+        newUploadBtn.addEventListener('click', resetUpload);
+        retryBtn.addEventListener('click', resetUpload);
+    </script>
+</body>
+</html>
