@@ -339,6 +339,89 @@ function assembleExtractionContext(
 }
 
 // ============================================================================
+// JSON Repair utilities for handling malformed AI responses
+// ============================================================================
+
+function repairJson(jsonText: string): string {
+  let repaired = jsonText.trim();
+  
+  // Remove trailing commas before ] or }
+  repaired = repaired.replace(/,(\s*[\]}])/g, '$1');
+  
+  // Remove trailing commas at the very end before closing bracket
+  repaired = repaired.replace(/,\s*$/, '');
+  
+  // If it doesn't end with ], try to close it
+  if (!repaired.endsWith(']')) {
+    // Find the last complete object (ends with })
+    const lastBrace = repaired.lastIndexOf('}');
+    if (lastBrace > 0) {
+      repaired = repaired.slice(0, lastBrace + 1) + ']';
+    }
+  }
+  
+  // Ensure it starts with [
+  if (!repaired.startsWith('[')) {
+    const firstBracket = repaired.indexOf('[');
+    if (firstBracket >= 0) {
+      repaired = repaired.slice(firstBracket);
+    }
+  }
+  
+  return repaired;
+}
+
+function extractRegistersFromMalformedJson(jsonText: string): Record<string, unknown>[] {
+  const registers: Record<string, unknown>[] = [];
+  
+  // Match individual register objects: {"address": ..., "name": ..., ...}
+  const objectPattern = /\{\s*"address"\s*:\s*(\d+)\s*,\s*"name"\s*:\s*"([^"]+)"\s*,\s*"datatype"\s*:\s*"([^"]+)"\s*,\s*"description"\s*:\s*"([^"]*)"\s*,\s*"writable"\s*:\s*(true|false)\s*\}/g;
+  
+  let match;
+  while ((match = objectPattern.exec(jsonText)) !== null) {
+    registers.push({
+      address: parseInt(match[1], 10),
+      name: match[2],
+      datatype: match[3],
+      description: match[4],
+      writable: match[5] === 'true',
+    });
+  }
+  
+  // If the simple pattern didn't work, try a more lenient extraction
+  if (registers.length === 0) {
+    // Find all {...} blocks that look like registers
+    const blockPattern = /\{[^{}]*"address"\s*:\s*\d+[^{}]*\}/g;
+    const blocks = jsonText.match(blockPattern) || [];
+    
+    for (const block of blocks) {
+      try {
+        // Try to parse each block individually
+        const parsed = JSON.parse(block);
+        if (typeof parsed.address === 'number') {
+          registers.push(parsed);
+        }
+      } catch {
+        // Try to extract fields manually
+        const addressMatch = block.match(/"address"\s*:\s*(\d+)/);
+        const nameMatch = block.match(/"name"\s*:\s*"([^"]+)"/);
+        if (addressMatch) {
+          registers.push({
+            address: parseInt(addressMatch[1], 10),
+            name: nameMatch ? nameMatch[1] : `Register_${addressMatch[1]}`,
+            datatype: 'UINT16',
+            description: '',
+            writable: false,
+          });
+        }
+      }
+    }
+  }
+  
+  return registers;
+}
+
+// ============================================================================
 // Stage 4: Enhanced AI prompt for register extraction
 // ============================================================================
 
@@ -398,6 +481,7 @@ ${context}`;
 
     console.log(`[AI] Response length: ${content.text.length} chars`);
     console.log(`[AI] First 500 chars: ${content.text.slice(0, 500)}`);
+    console.log(`[AI] Last 200 chars: ${content.text.slice(-200)}`);
 
     let jsonText = content.text.trim();
     
@@ -420,13 +504,21 @@ ${context}`;
       }
     }
 
+    // Apply JSON repair before parsing
+    jsonText = repairJson(jsonText);
+
     let parsed: unknown;
     try {
       parsed = JSON.parse(jsonText);
+      console.log(`[AI] JSON parsed successfully`);
     } catch (parseError) {
-      const fallbackMatch = jsonText.match(/\[\s*\{[\s\S]*?\}\s*\]/);
-      if (fallbackMatch) {
-        parsed = JSON.parse(fallbackMatch[0]);
+      console.log(`[AI] Initial JSON parse failed: ${parseError instanceof Error ? parseError.message : 'unknown'}`);
+      
+      // Try to extract individual register objects and rebuild array
+      const extractedRegisters = extractRegistersFromMalformedJson(jsonText);
+      if (extractedRegisters.length > 0) {
+        console.log(`[AI] Recovered ${extractedRegisters.length} registers from malformed JSON`);
+        parsed = extractedRegisters;
       } else {
         throw new Error("Could not extract register data from the document. The PDF may not contain recognizable Modbus register tables.");
       }
