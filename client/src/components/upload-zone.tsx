@@ -1,8 +1,8 @@
 import { useCallback, useState } from "react";
-import { Upload, FileCheck, X, FileText, FileCode, File } from "lucide-react";
+import { Upload, FileCheck, X, FileText, FileCode, File, FileType } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import type { ModbusFileFormat } from "@shared/schema";
+import type { ModbusSourceFormat } from "@shared/schema";
 
 interface UploadZoneProps {
   onFileSelect: (file: File) => void;
@@ -11,7 +11,7 @@ interface UploadZoneProps {
   onClear: () => void;
 }
 
-function getFileIcon(format: ModbusFileFormat | null) {
+function getFileIcon(format: ModbusSourceFormat | null) {
   switch (format) {
     case "csv":
       return <FileText className="h-12 w-12 text-success" />;
@@ -19,6 +19,8 @@ function getFileIcon(format: ModbusFileFormat | null) {
       return <FileCode className="h-12 w-12 text-primary" />;
     case "xml":
       return <File className="h-12 w-12 text-warning" />;
+    case "pdf":
+      return <FileType className="h-12 w-12 text-destructive" />;
     default:
       return <Upload className="h-12 w-12 text-muted-foreground" />;
   }
@@ -32,11 +34,12 @@ function formatFileSize(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 }
 
-function getFormatFromFilename(filename: string): ModbusFileFormat | null {
+function getFormatFromFilename(filename: string): ModbusSourceFormat | null {
   const ext = filename.split(".").pop()?.toLowerCase();
   if (ext === "csv") return "csv";
   if (ext === "json") return "json";
   if (ext === "xml") return "xml";
+  if (ext === "pdf") return "pdf";
   return null;
 }
 
@@ -100,7 +103,7 @@ export function UploadZone({
     >
       <input
         type="file"
-        accept=".csv,.xml,.json"
+        accept=".csv,.xml,.json,.pdf"
         onChange={handleFileInput}
         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
         disabled={isProcessing}
@@ -159,7 +162,7 @@ export function UploadZone({
               Drag & drop files or click to browse
             </p>
             <p className="text-sm text-muted-foreground">
-              Supports CSV, XML, and JSON formats
+              Supports CSV, XML, JSON, and PDF formats
             </p>
           </div>
           <Button variant="default" size="default" data-testid="button-browse">

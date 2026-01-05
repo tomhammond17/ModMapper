@@ -25,11 +25,13 @@ export const modbusRegisterSchema = z.object({
 export type ModbusRegister = z.infer<typeof modbusRegisterSchema>;
 
 export const modbusFileFormats = ["csv", "xml", "json"] as const;
+export const modbusSourceFormats = ["csv", "xml", "json", "pdf"] as const;
 export type ModbusFileFormat = (typeof modbusFileFormats)[number];
+export type ModbusSourceFormat = (typeof modbusSourceFormats)[number];
 
 export const insertModbusDocumentSchema = z.object({
   filename: z.string().min(1),
-  sourceFormat: z.enum(modbusFileFormats),
+  sourceFormat: z.enum(modbusSourceFormats),
   registers: z.array(modbusRegisterSchema),
 });
 
@@ -38,7 +40,7 @@ export type InsertModbusDocument = z.infer<typeof insertModbusDocumentSchema>;
 export interface ModbusDocument {
   id: string;
   filename: string;
-  sourceFormat: ModbusFileFormat;
+  sourceFormat: ModbusSourceFormat;
   registers: ModbusRegister[];
   createdAt: Date;
 }
@@ -47,7 +49,7 @@ export interface ConversionResult {
   success: boolean;
   message: string;
   registers: ModbusRegister[];
-  sourceFormat: ModbusFileFormat;
+  sourceFormat: ModbusSourceFormat;
   filename: string;
 }
 

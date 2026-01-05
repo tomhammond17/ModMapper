@@ -10,21 +10,107 @@ import { DownloadSection } from "@/components/download-section";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import type { ModbusRegister, ModbusFileFormat, ConversionResult } from "@shared/schema";
+import type { ModbusRegister, ModbusFileFormat, ModbusSourceFormat, ConversionResult } from "@shared/schema";
 
 type ConversionStep = "upload" | "converting" | "preview";
+
+interface PdfProgress {
+  stage: "extracting" | "analyzing" | "parsing" | "complete" | "error";
+  progress: number;
+  message: string;
+}
 
 export default function Home() {
   const { toast } = useToast();
   const [step, setStep] = useState<ConversionStep>("upload");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [sourceFormat, setSourceFormat] = useState<ModbusFileFormat | null>(null);
+  const [sourceFormat, setSourceFormat] = useState<ModbusSourceFormat | null>(null);
   const [targetFormat, setTargetFormat] = useState<ModbusFileFormat>("json");
   const [registers, setRegisters] = useState<ModbusRegister[]>([]);
   const [filename, setFilename] = useState<string>("");
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState<string>("");
+  const [isPdfProcessing, setIsPdfProcessing] = useState(false);
+
+  const parsePdfWithProgress = useCallback(async (file: File) => {
+    setIsPdfProcessing(true);
+    setStep("converting");
+    setProgress(10);
+    setStatusMessage("Uploading PDF...");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/parse-pdf-stream", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to parse PDF");
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error("Failed to read response stream");
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+
+              if (data.type === "progress") {
+                setProgress(data.progress);
+                setStatusMessage(data.message);
+              } else if (data.type === "complete") {
+                const result = data.result as ConversionResult;
+                setRegisters(result.registers);
+                setSourceFormat(result.sourceFormat);
+                setFilename(result.filename);
+                setProgress(100);
+                setStatusMessage("Conversion complete!");
+                setStep("preview");
+                toast({
+                  title: "Success",
+                  description: `Extracted ${result.registers.length} registers from PDF`,
+                });
+              } else if (data.type === "error") {
+                throw new Error(data.message);
+              }
+            } catch (e) {
+              if (e instanceof SyntaxError) continue;
+              throw e;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      setStep("upload");
+      setProgress(0);
+      setStatusMessage("");
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to parse PDF",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPdfProcessing(false);
+    }
+  }, [toast]);
 
   const parseMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -44,7 +130,7 @@ export default function Home() {
       setRegisters(data.registers);
       setSourceFormat(data.sourceFormat);
       setFilename(data.filename);
-      if (data.sourceFormat !== targetFormat) {
+      if (data.sourceFormat !== targetFormat && data.sourceFormat !== "pdf") {
         setStep("preview");
       } else {
         const nextFormat = data.sourceFormat === "json" ? "csv" : "json";
@@ -78,6 +164,8 @@ export default function Home() {
     if (ext === "csv") setSourceFormat("csv");
     else if (ext === "json") setSourceFormat("json");
     else if (ext === "xml") setSourceFormat("xml");
+    else if (ext === "pdf") setSourceFormat("pdf");
+    else setSourceFormat(null);
   }, []);
 
   const handleClearFile = useCallback(() => {
@@ -88,11 +176,21 @@ export default function Home() {
     setStep("upload");
     setProgress(0);
     setStatusMessage("");
+    setIsPdfProcessing(false);
   }, []);
 
   const handleConvert = useCallback(() => {
     if (!selectedFile) return;
 
+    const ext = selectedFile.name.split(".").pop()?.toLowerCase();
+
+    // Use streaming endpoint for PDF files
+    if (ext === "pdf") {
+      parsePdfWithProgress(selectedFile);
+      return;
+    }
+
+    // Regular parsing for other file types
     setStep("converting");
     setProgress(10);
     setStatusMessage("Reading file...");
@@ -116,14 +214,14 @@ export default function Home() {
     }, 800);
 
     parseMutation.mutate(selectedFile);
-  }, [selectedFile, parseMutation]);
+  }, [selectedFile, parseMutation, parsePdfWithProgress]);
 
   const handleClearAll = useCallback(() => {
     handleClearFile();
   }, [handleClearFile]);
 
-  const canConvert = !!selectedFile && !parseMutation.isPending;
-  const isProcessing = parseMutation.isPending || step === "converting";
+  const canConvert = !!selectedFile && !parseMutation.isPending && !isPdfProcessing;
+  const isProcessing = parseMutation.isPending || step === "converting" || isPdfProcessing;
 
   return (
     <div className="min-h-screen bg-background">
@@ -154,7 +252,7 @@ export default function Home() {
             Convert Modbus Configuration Files
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Upload your Modbus register configurations in CSV, XML, or JSON format. 
+            Upload your Modbus register configurations in CSV, XML, JSON, or PDF format. 
             Preview, edit, and download in your preferred format.
           </p>
         </section>
@@ -203,7 +301,7 @@ export default function Home() {
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
               </div>
               <p className="text-lg font-medium text-foreground">
-                Processing your document...
+                {sourceFormat === "pdf" ? "Processing your PDF document..." : "Processing your document..."}
               </p>
               <p className="text-muted-foreground">{statusMessage}</p>
               <div className="max-w-xs mx-auto">
@@ -213,6 +311,7 @@ export default function Home() {
                     style={{ width: `${progress}%` }}
                   />
                 </div>
+                <p className="text-xs text-muted-foreground mt-2">{progress}% complete</p>
               </div>
             </div>
           )}
@@ -239,7 +338,7 @@ export default function Home() {
                 </div>
                 <div>
                   <p className="font-medium text-foreground">
-                    Conversion Successful
+                    {sourceFormat === "pdf" ? "PDF Extraction Successful" : "Conversion Successful"}
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {registers.length} registers loaded from {filename}

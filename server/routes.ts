@@ -1,31 +1,56 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import multer from "multer";
+import multer, { MulterError } from "multer";
 import { storage } from "./storage";
 import { parseFile, detectFormat } from "./parsers";
-import type { ConversionResult, ModbusFileFormat } from "@shared/schema";
+import { parsePdfFile, type PdfParseProgress } from "./pdf-parser";
+import type { ConversionResult, ModbusSourceFormat } from "@shared/schema";
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024,
+    fileSize: 50 * 1024 * 1024, // 50MB for PDFs
   },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = [".csv", ".json", ".xml"];
+    const allowedTypes = [".csv", ".json", ".xml", ".pdf"];
     const ext = file.originalname.toLowerCase().slice(file.originalname.lastIndexOf("."));
     if (allowedTypes.includes(ext)) {
       cb(null, true);
     } else {
-      cb(new Error("Invalid file type. Allowed types: CSV, JSON, XML"));
+      cb(new Error("Invalid file type. Allowed types: CSV, JSON, XML, PDF"));
     }
   },
 });
+
+// Error handling middleware for multer
+function handleMulterError(err: Error, req: Request, res: Response, next: NextFunction) {
+  if (err instanceof MulterError) {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({
+        success: false,
+        message: "File is too large. Maximum size is 50MB.",
+      });
+    }
+    return res.status(400).json({
+      success: false,
+      message: err.message,
+    });
+  }
+  if (err) {
+    return res.status(400).json({
+      success: false,
+      message: err.message,
+    });
+  }
+  next();
+}
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  app.post("/api/parse", upload.single("file"), async (req, res) => {
+  // Parse regular files (CSV, JSON, XML)
+  app.post("/api/parse", upload.single("file"), handleMulterError, async (req, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({
@@ -35,6 +60,45 @@ export async function registerRoutes(
       }
 
       const filename = req.file.originalname;
+      const ext = filename.toLowerCase().slice(filename.lastIndexOf("."));
+
+      // Handle PDF files separately
+      if (ext === ".pdf") {
+        try {
+          const registers = await parsePdfFile(req.file.buffer);
+
+          if (registers.length === 0) {
+            return res.status(400).json({
+              success: false,
+              message: "No Modbus registers found in the PDF. The document may not contain recognizable register tables.",
+            });
+          }
+
+          await storage.createDocument({
+            filename,
+            sourceFormat: "pdf" as ModbusSourceFormat,
+            registers,
+          });
+
+          const result: ConversionResult = {
+            success: true,
+            message: `Successfully extracted ${registers.length} registers from PDF`,
+            registers,
+            sourceFormat: "pdf" as ModbusSourceFormat,
+            filename,
+          };
+
+          return res.json(result);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Failed to parse PDF";
+          return res.status(400).json({
+            success: false,
+            message,
+          });
+        }
+      }
+
+      // Handle regular files (CSV, JSON, XML)
       const content = req.file.buffer.toString("utf-8");
       const format = detectFormat(filename);
 
@@ -68,6 +132,69 @@ export async function registerRoutes(
         success: false,
         message,
       });
+    }
+  });
+
+  // Stream PDF parsing with progress updates (Server-Sent Events)
+  app.post("/api/parse-pdf-stream", upload.single("file"), handleMulterError, async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "No file provided",
+      });
+    }
+
+    const filename = req.file.originalname;
+    const ext = filename.toLowerCase().slice(filename.lastIndexOf("."));
+
+    if (ext !== ".pdf") {
+      return res.status(400).json({
+        success: false,
+        message: "This endpoint only accepts PDF files",
+      });
+    }
+
+    // Set up SSE
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    const sendProgress = (progress: PdfParseProgress) => {
+      res.write(`data: ${JSON.stringify({ type: "progress", ...progress })}\n\n`);
+    };
+
+    try {
+      const registers = await parsePdfFile(req.file.buffer, sendProgress);
+
+      if (registers.length === 0) {
+        res.write(`data: ${JSON.stringify({ 
+          type: "error", 
+          message: "No Modbus registers found in the PDF" 
+        })}\n\n`);
+        return res.end();
+      }
+
+      await storage.createDocument({
+        filename,
+        sourceFormat: "pdf" as ModbusSourceFormat,
+        registers,
+      });
+
+      const result: ConversionResult = {
+        success: true,
+        message: `Successfully extracted ${registers.length} registers from PDF`,
+        registers,
+        sourceFormat: "pdf" as ModbusSourceFormat,
+        filename,
+      };
+
+      res.write(`data: ${JSON.stringify({ type: "complete", result })}\n\n`);
+      return res.end();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to parse PDF";
+      res.write(`data: ${JSON.stringify({ type: "error", message })}\n\n`);
+      return res.end();
     }
   });
 

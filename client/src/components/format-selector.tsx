@@ -1,11 +1,11 @@
 import { FileText, FileCode, File } from "lucide-react";
-import type { ModbusFileFormat } from "@shared/schema";
+import type { ModbusFileFormat, ModbusSourceFormat } from "@shared/schema";
 
 interface FormatSelectorProps {
   selectedFormat: ModbusFileFormat;
   onFormatChange: (format: ModbusFileFormat) => void;
   disabled?: boolean;
-  sourceFormat?: ModbusFileFormat | null;
+  sourceFormat?: ModbusSourceFormat | null;
 }
 
 const formats: { value: ModbusFileFormat; label: string; icon: typeof FileText }[] = [
