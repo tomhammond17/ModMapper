@@ -19,8 +19,11 @@ export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   try {
     // Dynamic import for pdf-parse (CommonJS module)
     const pdfParseModule = await import("pdf-parse");
-    const pdfParse = (pdfParseModule as { default?: (buffer: Buffer) => Promise<{ text: string }> }).default ?? pdfParseModule;
-    const data = await (pdfParse as (buffer: Buffer) => Promise<{ text: string }>)(buffer);
+    // Handle both ESM default export and CommonJS module.exports
+    const pdfParse = typeof pdfParseModule.default === "function" 
+      ? pdfParseModule.default 
+      : pdfParseModule;
+    const data = await pdfParse(buffer);
     return data.text;
   } catch (error) {
     throw new Error(`Failed to extract text from PDF: ${error instanceof Error ? error.message : "Unknown error"}`);
