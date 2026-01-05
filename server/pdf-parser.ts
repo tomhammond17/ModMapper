@@ -22,6 +22,11 @@ export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
     const parser = new PDFParse({ data: buffer });
     const result = await parser.getText();
     await parser.destroy();
+    
+    // Debug: Log extracted text length and sample
+    console.log(`[PDF Debug] Extracted ${result.text.length} characters from PDF`);
+    console.log(`[PDF Debug] First 500 chars: ${result.text.slice(0, 500)}`);
+    
     return result.text;
   } catch (error) {
     throw new Error(`Failed to extract text from PDF: ${error instanceof Error ? error.message : "Unknown error"}`);
@@ -72,6 +77,9 @@ ${text.slice(0, 50000)}`;
     if (content.type !== "text") {
       throw new Error("Unexpected response type from AI");
     }
+
+    // Debug: Log Claude's raw response
+    console.log(`[AI Debug] Claude response (first 1000 chars): ${content.text.slice(0, 1000)}`);
 
     let jsonText = content.text.trim();
     
