@@ -30,40 +30,34 @@ export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
 export async function parseModbusRegistersFromText(
   text: string
 ): Promise<ModbusRegister[]> {
-  const prompt = `You are an expert at parsing Modbus register documentation. Analyze the following text extracted from a PDF document and identify all Modbus registers.
+  const prompt = `You are an expert at parsing Modbus register documentation.
 
-For each register found, extract:
-- address: The register address (integer)
-- name: The register name/label
-- datatype: One of these types: ${modbusDataTypes.join(", ")}
-- description: A brief description of what the register contains
-- writable: Whether the register is writable (true/false)
+CRITICAL INSTRUCTIONS - YOU MUST FOLLOW THESE EXACTLY:
+1. Output ONLY valid JSON - no explanations, no markdown code blocks, no comments
+2. Start your response with [ and end with ]
+3. Do NOT include any text before or after the JSON array
 
-Common data type mappings:
-- INT, INT16, SINT16, INTEGER → INT16
-- UINT, UINT16, WORD → UINT16
-- INT32, SINT32, LONG → INT32
-- UINT32, DWORD, ULONG → UINT32
-- FLOAT, FLOAT32, REAL, SINGLE → FLOAT32
-- FLOAT64, DOUBLE, LREAL → FLOAT64
-- STRING, ASCII → STRING
-- BOOL, BOOLEAN, BIT → BOOL
+Analyze this text and extract Modbus registers into this EXACT format:
+[{"address": 40001, "name": "RegName", "datatype": "UINT16", "description": "desc", "writable": false}]
+
+Valid datatypes: ${modbusDataTypes.join(", ")}
+
+Type mappings:
+- INT/INT16/SINT16/INTEGER → INT16
+- UINT/UINT16/WORD → UINT16
+- INT32/SINT32/LONG → INT32
+- UINT32/DWORD/ULONG → UINT32
+- FLOAT/FLOAT32/REAL/SINGLE → FLOAT32
+- FLOAT64/DOUBLE/LREAL → FLOAT64
+- STRING/ASCII → STRING
+- BOOL/BOOLEAN/BIT → BOOL
 - COIL → COIL
 
-For writability:
-- "R/W", "RW", "Read/Write", "Write" → true
-- "R", "RO", "Read Only", "Read" → false
+Writability: "R/W", "RW", "Read/Write", "Write" → true; otherwise → false
 
-Return ONLY a valid JSON array of register objects. No explanation, no markdown, just the JSON array.
-If you cannot find any registers, return an empty array: []
+If no registers found, output exactly: []
 
-Example output format:
-[
-  {"address": 40001, "name": "Temperature", "datatype": "FLOAT32", "description": "Current temperature reading", "writable": false},
-  {"address": 40003, "name": "Setpoint", "datatype": "FLOAT32", "description": "Temperature setpoint", "writable": true}
-]
-
-PDF Text to analyze:
+TEXT TO ANALYZE:
 ${text.slice(0, 50000)}`;
 
   try {
@@ -91,7 +85,26 @@ ${text.slice(0, 50000)}`;
     }
     jsonText = jsonText.trim();
 
-    const parsed = JSON.parse(jsonText);
+    // Try to find JSON array in response if not starting with [
+    if (!jsonText.startsWith("[")) {
+      const arrayMatch = jsonText.match(/\[[\s\S]*\]/);
+      if (arrayMatch) {
+        jsonText = arrayMatch[0];
+      }
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonText);
+    } catch (parseError) {
+      // Attempt recovery: extract any JSON-like structure
+      const fallbackMatch = jsonText.match(/\[\s*\{[\s\S]*?\}\s*\]/);
+      if (fallbackMatch) {
+        parsed = JSON.parse(fallbackMatch[0]);
+      } else {
+        throw new Error("Could not extract register data from the document. The PDF may not contain recognizable Modbus register tables.");
+      }
+    }
     
     if (!Array.isArray(parsed)) {
       throw new Error("AI response is not an array");
@@ -200,12 +213,7 @@ export async function parsePdfFile(
 
     const registers = await parseModbusRegistersFromText(text);
 
-    // Stage 4: Complete
-    onProgress?.({
-      stage: "complete",
-      progress: 100,
-      message: `Found ${registers.length} registers`,
-    });
+    // Note: Complete event is sent by the caller (routes.ts) to avoid duplicates
 
     return registers;
   } catch (error) {
