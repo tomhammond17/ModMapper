@@ -909,7 +909,7 @@ export async function parsePdfWithPageHints(
   try {
     onProgress?.({
       stage: "extracting",
-      progress: 20,
+      progress: 10,
       message: "Extracting specified pages...",
     });
 
@@ -947,7 +947,7 @@ export async function parsePdfWithPageHints(
     
     // Filter to only requested valid pages
     const targetPages: PageData[] = [];
-    const validPageArray = Array.from(validPageNums);
+    const validPageArray = Array.from(validPageNums).sort((a, b) => a - b);
     for (const pageNum of validPageArray) {
       const page = pages.find(pg => pg.pageNum === pageNum);
       if (page) {
@@ -961,32 +961,61 @@ export async function parsePdfWithPageHints(
     
     onProgress?.({
       stage: "extracting",
-      progress: 40,
+      progress: 15,
       message: `Found ${targetPages.length} pages in specified ranges`,
     });
 
-    // Sort by page number for coherent context
-    targetPages.sort((a, b) => a.pageNum - b.pageNum);
-    
-    // Build context from target pages only
-    let context = "";
-    for (const page of targetPages) {
-      context += `\n\n=== PAGE ${page.pageNum} ===\n${page.text}`;
+    // Process in batches of 4 pages for better accuracy
+    const batches: PageData[][] = [];
+    for (let i = 0; i < targetPages.length; i += PAGES_PER_BATCH) {
+      batches.push(targetPages.slice(i, i + PAGES_PER_BATCH));
     }
     
-    // Add any document hints
-    if (hints.length > 0) {
-      context = `Document hints:\n${hints.map(h => `- ${h.type}: ${h.context}`).join("\n")}\n\n${context}`;
-    }
+    const totalBatches = batches.length;
+    const allRegisters: ModbusRegister[] = [];
+    const batchResults: BatchResult[] = [];
     
     onProgress?.({
       stage: "parsing",
-      progress: 60,
-      message: "Extracting registers with AI...",
-      details: `Sending ${Math.round(context.length / 1000)}KB from ${targetPages.length} pages`,
+      progress: 20,
+      message: `Processing ${targetPages.length} pages in ${totalBatches} batches...`,
     });
 
-    const newRegisters = await parseModbusRegistersFromContext(context);
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i];
+      const batchNum = i + 1;
+      const progressPercent = 20 + Math.round((i / totalBatches) * 70);
+      
+      const pageNums = batch.map(p => p.pageNum);
+      const pageRange = pageNums.length === 1 
+        ? `${pageNums[0]}` 
+        : `${pageNums[0]}-${pageNums[pageNums.length - 1]}`;
+      
+      onProgress?.({
+        stage: "parsing",
+        progress: progressPercent,
+        message: `Batch ${batchNum}/${totalBatches}: Processing pages ${pageRange}...`,
+        details: `${allRegisters.length} registers found so far`,
+      });
+      
+      try {
+        const result = await extractBatch(batch, batchNum, hints);
+        batchResults.push(result);
+        allRegisters.push(...result.registers);
+        
+        onProgress?.({
+          stage: "parsing",
+          progress: progressPercent + 5,
+          message: `Batch ${batchNum}/${totalBatches}: Found ${result.registersFound} registers`,
+          details: `Pages ${pageRange} complete. Total: ${allRegisters.length} registers`,
+        });
+      } catch (batchError) {
+        console.error(`[Batch ${batchNum}] Error:`, batchError);
+      }
+    }
+
+    // Merge and deduplicate new registers
+    const newRegisters = mergeAndDeduplicateRegisters(allRegisters);
     
     // Merge with existing registers, avoiding duplicates by address
     const existingAddresses = new Set(existingRegisters.map(r => r.address));
@@ -1004,6 +1033,10 @@ export async function parsePdfWithPageHints(
       message: `Found ${uniqueNewRegisters.length} new registers (${mergedRegisters.length} total)`,
     });
 
+    const batchSummary = batchResults.map(b => 
+      `Pages ${b.pageRange}: ${b.registersFound} registers`
+    ).join("; ");
+
     const metadata: ExtractionMetadata = {
       totalPages,
       pagesAnalyzed: targetPages.length,
@@ -1011,6 +1044,7 @@ export async function parsePdfWithPageHints(
       highRelevancePages: targetPages.length,
       confidenceLevel: calculateConfidenceLevel(mergedRegisters.length, targetPages.length, totalPages),
       processingTimeMs,
+      batchSummary,
     };
 
     return { registers: mergedRegisters, metadata };
