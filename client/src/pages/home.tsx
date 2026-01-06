@@ -8,6 +8,7 @@ import { RegisterTable } from "@/components/register-table";
 import { PreviewPanel } from "@/components/preview-panel";
 import { DownloadSection } from "@/components/download-section";
 import { ExtractionFeedback } from "@/components/extraction-feedback";
+import { ExtractionGuide } from "@/components/extraction-guide";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -183,6 +184,95 @@ export default function Home() {
     setIsPdfProcessing(false);
     setExtractionMetadata(null);
   }, []);
+
+  const handleReExtractWithHints = useCallback(async (pageRanges: string) => {
+    if (!selectedFile) return;
+    
+    setIsPdfProcessing(true);
+    setStep("converting");
+    setProgress(10);
+    setStatusMessage("Re-extracting from specified pages...");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      formData.append("pageRanges", pageRanges);
+      formData.append("existingRegisters", JSON.stringify(registers));
+
+      const response = await fetch("/api/parse-pdf-with-hints", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to re-extract from PDF");
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error("Failed to read response stream");
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+
+              if (data.type === "progress") {
+                setProgress(data.progress);
+                setStatusMessage(data.message);
+              } else if (data.type === "complete") {
+                const result = data.result as ConversionResult;
+                const previousCount = registers.length;
+                const newCount = result.registers.length - previousCount;
+                setRegisters(result.registers);
+                setExtractionMetadata(result.extractionMetadata || null);
+                setProgress(100);
+                setStatusMessage("Re-extraction complete!");
+                setStep("preview");
+                toast({
+                  title: "Success",
+                  description: newCount > 0 
+                    ? `Found ${newCount} additional registers (${result.registers.length} total)`
+                    : newCount === 0
+                    ? `No new unique registers found. Total: ${result.registers.length}`
+                    : `Re-extracted ${result.registers.length} registers`,
+                });
+              } else if (data.type === "error") {
+                throw new Error(data.message);
+              }
+            } catch (e) {
+              if (e instanceof SyntaxError) continue;
+              throw e;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      setStep("preview");
+      setProgress(0);
+      setStatusMessage("");
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to re-extract from PDF",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPdfProcessing(false);
+    }
+  }, [selectedFile, registers, toast]);
 
   const handleConvert = useCallback(() => {
     if (!selectedFile) return;
@@ -363,6 +453,16 @@ export default function Home() {
 
             {extractionMetadata && sourceFormat === "pdf" && (
               <ExtractionFeedback metadata={extractionMetadata} />
+            )}
+
+            {extractionMetadata && sourceFormat === "pdf" && (
+              <ExtractionGuide
+                metadata={extractionMetadata}
+                registers={registers}
+                selectedFile={selectedFile}
+                onReExtract={handleReExtractWithHints}
+                isProcessing={isPdfProcessing}
+              />
             )}
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 bg-card rounded-md border">

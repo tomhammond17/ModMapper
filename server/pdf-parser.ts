@@ -777,14 +777,42 @@ export async function parsePdfWithPageHints(
     const { pages, hints } = await extractPagesFromPdf(buffer);
     const totalPages = pages.length;
     
-    // Filter to only requested pages
-    const targetPages: PageData[] = [];
+    // Validate and clamp page hints to valid bounds, de-duplicate
+    const validPageNums = new Set<number>();
+    const outOfRange: number[] = [];
+    
     for (const hint of pageHints) {
-      for (let p = hint.start; p <= hint.end && p <= totalPages; p++) {
-        const page = pages.find(pg => pg.pageNum === p);
-        if (page && !targetPages.some(tp => tp.pageNum === p)) {
-          targetPages.push(page);
-        }
+      const clampedStart = Math.max(1, hint.start);
+      const clampedEnd = Math.min(totalPages, hint.end);
+      
+      if (hint.start > totalPages) {
+        outOfRange.push(hint.start);
+      }
+      if (hint.end > totalPages && hint.start <= totalPages) {
+        outOfRange.push(hint.end);
+      }
+      
+      for (let p = clampedStart; p <= clampedEnd; p++) {
+        validPageNums.add(p);
+      }
+    }
+    
+    if (validPageNums.size === 0) {
+      throw new Error(`Invalid page ranges. The PDF has ${totalPages} pages. Specified pages (${outOfRange.join(", ")}) are out of range.`);
+    }
+    
+    // Log warning for out-of-range pages
+    if (outOfRange.length > 0) {
+      console.log(`[PDF] Warning: Pages ${outOfRange.join(", ")} are out of range (PDF has ${totalPages} pages). Using valid pages only.`);
+    }
+    
+    // Filter to only requested valid pages
+    const targetPages: PageData[] = [];
+    const validPageArray = Array.from(validPageNums);
+    for (const pageNum of validPageArray) {
+      const page = pages.find(pg => pg.pageNum === pageNum);
+      if (page) {
+        targetPages.push(page);
       }
     }
     
