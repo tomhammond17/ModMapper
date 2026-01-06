@@ -752,19 +752,28 @@ export async function parsePdfFile(
     const highPages = rankedPages.filter(p => p.score > 5);
     const medPages = rankedPages.filter(p => p.score > 2 && p.score <= 5);
     
-    // Select pages to process: all high + medium relevance pages
-    const pagesToProcess = [...highPages, ...medPages];
+    // Also include low-score pages that have tabular structure (often appendix tables)
+    const lowPagesWithTables = rankedPages.filter(p => 
+      p.score <= 2 && 
+      p.hasTable && 
+      p.text.length > 200
+    );
+    
+    // Select pages to process: high + medium + low pages with tables
+    const pagesToProcess = [...highPages, ...medPages, ...lowPagesWithTables];
     
     // Sort by page number for sequential processing
     pagesToProcess.sort((a, b) => a.pageNum - b.pageNum);
     
     const pagesAnalyzed = pagesToProcess.length;
     
+    console.log(`[PDF] Page selection: ${highPages.length} high, ${medPages.length} medium, ${lowPagesWithTables.length} low-with-tables`);
+    
     onProgress?.({
       stage: "scoring",
       progress: 25,
       message: `Found ${pagesAnalyzed} relevant pages to process`,
-      details: `${highPages.length} high-relevance, ${medPages.length} medium-relevance`,
+      details: `${highPages.length} high, ${medPages.length} medium, ${lowPagesWithTables.length} table-only`,
     });
 
     if (pagesToProcess.length === 0) {
