@@ -7,10 +7,11 @@ import { ConversionControls } from "@/components/conversion-controls";
 import { RegisterTable } from "@/components/register-table";
 import { PreviewPanel } from "@/components/preview-panel";
 import { DownloadSection } from "@/components/download-section";
+import { ExtractionFeedback } from "@/components/extraction-feedback";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import type { ModbusRegister, ModbusFileFormat, ModbusSourceFormat, ConversionResult } from "@shared/schema";
+import type { ModbusRegister, ModbusFileFormat, ModbusSourceFormat, ConversionResult, ExtractionMetadata } from "@shared/schema";
 
 type ConversionStep = "upload" | "converting" | "preview";
 
@@ -31,6 +32,7 @@ export default function Home() {
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState<string>("");
   const [isPdfProcessing, setIsPdfProcessing] = useState(false);
+  const [extractionMetadata, setExtractionMetadata] = useState<ExtractionMetadata | null>(null);
 
   const parsePdfWithProgress = useCallback(async (file: File) => {
     setIsPdfProcessing(true);
@@ -81,6 +83,7 @@ export default function Home() {
                 setRegisters(result.registers);
                 setSourceFormat(result.sourceFormat);
                 setFilename(result.filename);
+                setExtractionMetadata(result.extractionMetadata || null);
                 setProgress(100);
                 setStatusMessage("Conversion complete!");
                 setStep("preview");
@@ -177,6 +180,7 @@ export default function Home() {
     setProgress(0);
     setStatusMessage("");
     setIsPdfProcessing(false);
+    setExtractionMetadata(null);
   }, []);
 
   const handleConvert = useCallback(() => {
@@ -355,6 +359,10 @@ export default function Home() {
                 <Badge variant="default">{targetFormat.toUpperCase()}</Badge>
               </div>
             </div>
+
+            {extractionMetadata && sourceFormat === "pdf" && (
+              <ExtractionFeedback metadata={extractionMetadata} />
+            )}
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 bg-card rounded-md border">
               <FormatSelector

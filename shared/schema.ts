@@ -45,12 +45,22 @@ export interface ModbusDocument {
   createdAt: Date;
 }
 
+export interface ExtractionMetadata {
+  totalPages: number;
+  pagesAnalyzed: number;
+  registersFound: number;
+  confidenceLevel: "high" | "medium" | "low";
+  highRelevancePages: number;
+  processingTimeMs: number;
+}
+
 export interface ConversionResult {
   success: boolean;
   message: string;
   registers: ModbusRegister[];
   sourceFormat: ModbusSourceFormat;
   filename: string;
+  extractionMetadata?: ExtractionMetadata;
 }
 
 export interface ValidationError {

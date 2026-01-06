@@ -1,6 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { ModbusRegister, ModbusDataType } from "@shared/schema";
+import type { ModbusRegister, ModbusDataType, ExtractionMetadata } from "@shared/schema";
 import { modbusDataTypes } from "@shared/schema";
+
+export interface PdfExtractionResult {
+  registers: ModbusRegister[];
+  metadata: ExtractionMetadata;
+}
 
 // Polyfill DOMMatrix for Node.js environment (required by pdfjs-dist)
 if (typeof globalThis.DOMMatrix === "undefined") {
@@ -612,10 +617,24 @@ function normalizeDataType(value: string): ModbusDataType {
 // Main entry point: Intelligent PDF parsing pipeline
 // ============================================================================
 
+function calculateConfidenceLevel(
+  registersFound: number,
+  highRelevancePages: number,
+  totalPages: number
+): "high" | "medium" | "low" {
+  const pageRatio = highRelevancePages / Math.max(totalPages, 1);
+  
+  if (registersFound >= 20 && pageRatio >= 0.1) return "high";
+  if (registersFound >= 5 && highRelevancePages >= 3) return "medium";
+  return "low";
+}
+
 export async function parsePdfFile(
   buffer: Buffer,
   onProgress?: (progress: PdfParseProgress) => void
-): Promise<ModbusRegister[]> {
+): Promise<PdfExtractionResult> {
+  const startTime = Date.now();
+  
   try {
     // Stage 1: Extract pages
     onProgress?.({
@@ -630,10 +649,12 @@ export async function parsePdfFile(
       throw new Error("PDF appears to be empty or contains no extractable text.");
     }
     
+    const totalPages = pages.length;
+    
     onProgress?.({
       stage: "extracting",
       progress: 25,
-      message: `Extracted ${pages.length} pages from PDF`,
+      message: `Extracted ${totalPages} pages from PDF`,
       details: `Found ${hints.length} document hints`,
     });
 
@@ -647,6 +668,7 @@ export async function parsePdfFile(
     const rankedPages = scorePages(pages);
     const highPages = rankedPages.filter(p => p.score > 8);
     const medPages = rankedPages.filter(p => p.score > 3 && p.score <= 8);
+    const pagesAnalyzed = highPages.length + medPages.length;
     
     onProgress?.({
       stage: "scoring",
@@ -677,6 +699,7 @@ export async function parsePdfFile(
     });
 
     const registers = await parseModbusRegistersFromContext(context);
+    const processingTimeMs = Date.now() - startTime;
 
     onProgress?.({
       stage: "parsing",
@@ -684,7 +707,16 @@ export async function parsePdfFile(
       message: `Found ${registers.length} registers`,
     });
 
-    return registers;
+    const metadata: ExtractionMetadata = {
+      totalPages,
+      pagesAnalyzed,
+      registersFound: registers.length,
+      highRelevancePages: highPages.length,
+      confidenceLevel: calculateConfidenceLevel(registers.length, highPages.length, totalPages),
+      processingTimeMs,
+    };
+
+    return { registers, metadata };
   } catch (error) {
     onProgress?.({
       stage: "error",

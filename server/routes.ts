@@ -165,7 +165,7 @@ export async function registerRoutes(
     };
 
     try {
-      const registers = await parsePdfFile(req.file.buffer, sendProgress);
+      const { registers, metadata } = await parsePdfFile(req.file.buffer, sendProgress);
 
       if (registers.length === 0) {
         res.write(`data: ${JSON.stringify({ 
@@ -187,6 +187,7 @@ export async function registerRoutes(
         registers,
         sourceFormat: "pdf" as ModbusSourceFormat,
         filename,
+        extractionMetadata: metadata,
       };
 
       res.write(`data: ${JSON.stringify({ type: "complete", result })}\n\n`);
