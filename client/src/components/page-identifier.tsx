@@ -1,15 +1,53 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { FileText, Zap, BookOpen, ListOrdered, Target, ArrowRight, Lightbulb } from "lucide-react";
+import { FileText, Zap, BookOpen, ListOrdered, Target, ArrowRight, Lightbulb, AlertCircle } from "lucide-react";
 
 interface PageIdentifierProps {
   fileName: string;
   onExtractPages: (pageRanges: string) => void;
   onExtractFullDocument: () => void;
   onCancel: () => void;
+}
+
+function validatePageRanges(input: string): { valid: boolean; error?: string; normalized?: string } {
+  if (!input.trim()) {
+    return { valid: false, error: "Please enter page numbers or ranges" };
+  }
+  
+  const parts = input.split(/[,;]+/).map(p => p.trim()).filter(Boolean);
+  if (parts.length === 0) {
+    return { valid: false, error: "Please enter page numbers or ranges" };
+  }
+  
+  const normalized: string[] = [];
+  
+  for (const part of parts) {
+    const rangeMatch = part.match(/^(\d+)\s*[-–]\s*(\d+)$/);
+    if (rangeMatch) {
+      const start = parseInt(rangeMatch[1], 10);
+      const end = parseInt(rangeMatch[2], 10);
+      if (start < 1 || end < 1) {
+        return { valid: false, error: `Invalid page number: pages must be 1 or greater` };
+      }
+      if (start > end) {
+        return { valid: false, error: `Invalid range "${part}": start must be less than or equal to end` };
+      }
+      normalized.push(`${start}-${end}`);
+    } else if (/^\d+$/.test(part)) {
+      const page = parseInt(part, 10);
+      if (page < 1) {
+        return { valid: false, error: `Invalid page number: pages must be 1 or greater` };
+      }
+      normalized.push(part);
+    } else {
+      return { valid: false, error: `Invalid format "${part}": use numbers like "5" or ranges like "10-20"` };
+    }
+  }
+  
+  return { valid: true, normalized: normalized.join(", ") };
 }
 
 export function PageIdentifier({ 
@@ -20,14 +58,17 @@ export function PageIdentifier({
 }: PageIdentifierProps) {
   const [pageRanges, setPageRanges] = useState("");
   const [showFullDocOption, setShowFullDocOption] = useState(false);
+  
+  const validation = useMemo(() => validatePageRanges(pageRanges), [pageRanges]);
 
   const handleExtractPages = () => {
-    if (pageRanges.trim()) {
-      onExtractPages(pageRanges.trim());
+    if (validation.valid && validation.normalized) {
+      onExtractPages(validation.normalized);
     }
   };
 
-  const isValidInput = pageRanges.trim().length > 0;
+  const isValidInput = validation.valid;
+  const showError = pageRanges.trim().length > 0 && !validation.valid;
 
   return (
     <Card className="max-w-2xl mx-auto">
@@ -69,11 +110,18 @@ export function PageIdentifier({
               placeholder="e.g., 54-70 or 10, 15-20, 45"
               value={pageRanges}
               onChange={(e) => setPageRanges(e.target.value)}
-              className="font-mono"
+              className={`font-mono ${showError ? "border-destructive" : ""}`}
             />
-            <p className="text-xs text-muted-foreground">
-              Separate multiple ranges with commas. Example: 1-5, 10, 15-20
-            </p>
+            {showError ? (
+              <p className="text-xs text-destructive flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                {validation.error}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Separate multiple ranges with commas. Example: 1-5, 10, 15-20
+              </p>
+            )}
           </div>
 
           <div className="grid gap-3 pt-2">

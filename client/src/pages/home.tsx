@@ -204,6 +204,7 @@ export default function Home() {
     setIsPdfProcessing(true);
     setStep("converting");
     setProgress(10);
+    setProcessingStartTime(Date.now());
     setStatusMessage("Re-extracting from specified pages...");
 
     try {
