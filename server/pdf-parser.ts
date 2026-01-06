@@ -727,6 +727,136 @@ export async function parsePdfFile(
   }
 }
 
+// ============================================================================
+// Targeted page extraction with user-specified page hints
+// ============================================================================
+
+export interface PageHint {
+  start: number;
+  end: number;
+}
+
+export function parsePageRanges(rangeString: string): PageHint[] {
+  const hints: PageHint[] = [];
+  const parts = rangeString.split(",").map(s => s.trim()).filter(Boolean);
+  
+  for (const part of parts) {
+    if (part.includes("-")) {
+      const [startStr, endStr] = part.split("-").map(s => s.trim());
+      const start = parseInt(startStr, 10);
+      const end = parseInt(endStr, 10);
+      if (!isNaN(start) && !isNaN(end) && start > 0 && end >= start) {
+        hints.push({ start, end });
+      }
+    } else {
+      const page = parseInt(part, 10);
+      if (!isNaN(page) && page > 0) {
+        hints.push({ start: page, end: page });
+      }
+    }
+  }
+  
+  return hints;
+}
+
+export async function parsePdfWithPageHints(
+  buffer: Buffer,
+  pageHints: PageHint[],
+  existingRegisters: ModbusRegister[],
+  onProgress?: (progress: PdfParseProgress) => void
+): Promise<PdfExtractionResult> {
+  const startTime = Date.now();
+  
+  try {
+    onProgress?.({
+      stage: "extracting",
+      progress: 20,
+      message: "Extracting specified pages...",
+    });
+
+    const { pages, hints } = await extractPagesFromPdf(buffer);
+    const totalPages = pages.length;
+    
+    // Filter to only requested pages
+    const targetPages: PageData[] = [];
+    for (const hint of pageHints) {
+      for (let p = hint.start; p <= hint.end && p <= totalPages; p++) {
+        const page = pages.find(pg => pg.pageNum === p);
+        if (page && !targetPages.some(tp => tp.pageNum === p)) {
+          targetPages.push(page);
+        }
+      }
+    }
+    
+    if (targetPages.length === 0) {
+      throw new Error("No valid pages found in the specified ranges.");
+    }
+    
+    onProgress?.({
+      stage: "extracting",
+      progress: 40,
+      message: `Found ${targetPages.length} pages in specified ranges`,
+    });
+
+    // Sort by page number for coherent context
+    targetPages.sort((a, b) => a.pageNum - b.pageNum);
+    
+    // Build context from target pages only
+    let context = "";
+    for (const page of targetPages) {
+      context += `\n\n=== PAGE ${page.pageNum} ===\n${page.text}`;
+    }
+    
+    // Add any document hints
+    if (hints.length > 0) {
+      context = `Document hints:\n${hints.map(h => `- ${h.type}: ${h.context}`).join("\n")}\n\n${context}`;
+    }
+    
+    onProgress?.({
+      stage: "parsing",
+      progress: 60,
+      message: "Extracting registers with AI...",
+      details: `Sending ${Math.round(context.length / 1000)}KB from ${targetPages.length} pages`,
+    });
+
+    const newRegisters = await parseModbusRegistersFromContext(context);
+    
+    // Merge with existing registers, avoiding duplicates by address
+    const existingAddresses = new Set(existingRegisters.map(r => r.address));
+    const uniqueNewRegisters = newRegisters.filter(r => !existingAddresses.has(r.address));
+    const mergedRegisters = [...existingRegisters, ...uniqueNewRegisters];
+    
+    // Sort by address
+    mergedRegisters.sort((a, b) => a.address - b.address);
+    
+    const processingTimeMs = Date.now() - startTime;
+    
+    onProgress?.({
+      stage: "complete",
+      progress: 100,
+      message: `Found ${uniqueNewRegisters.length} new registers (${mergedRegisters.length} total)`,
+    });
+
+    const metadata: ExtractionMetadata = {
+      totalPages,
+      pagesAnalyzed: targetPages.length,
+      registersFound: mergedRegisters.length,
+      highRelevancePages: targetPages.length,
+      confidenceLevel: calculateConfidenceLevel(mergedRegisters.length, targetPages.length, totalPages),
+      processingTimeMs,
+    };
+
+    return { registers: mergedRegisters, metadata };
+  } catch (error) {
+    onProgress?.({
+      stage: "error",
+      progress: 0,
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+    throw error;
+  }
+}
+
 // Legacy export for backwards compatibility
 export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   const { pages } = await extractPagesFromPdf(buffer);

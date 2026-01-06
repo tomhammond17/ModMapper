@@ -3,8 +3,8 @@ import { createServer, type Server } from "http";
 import multer, { MulterError } from "multer";
 import { storage } from "./storage";
 import { parseFile, detectFormat } from "./parsers";
-import { parsePdfFile, type PdfParseProgress } from "./pdf-parser";
-import type { ConversionResult, ModbusSourceFormat } from "@shared/schema";
+import { parsePdfFile, parsePdfWithPageHints, parsePageRanges, type PdfParseProgress } from "./pdf-parser";
+import type { ConversionResult, ModbusSourceFormat, ModbusRegister } from "@shared/schema";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -184,6 +184,101 @@ export async function registerRoutes(
       const result: ConversionResult = {
         success: true,
         message: `Successfully extracted ${registers.length} registers from PDF`,
+        registers,
+        sourceFormat: "pdf" as ModbusSourceFormat,
+        filename,
+        extractionMetadata: metadata,
+      };
+
+      res.write(`data: ${JSON.stringify({ type: "complete", result })}\n\n`);
+      return res.end();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to parse PDF";
+      res.write(`data: ${JSON.stringify({ type: "error", message })}\n\n`);
+      return res.end();
+    }
+  });
+
+  // Re-extract with page hints - targeted extraction on specific pages
+  app.post("/api/parse-pdf-with-hints", upload.single("file"), handleMulterError, async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "No file provided",
+      });
+    }
+
+    const filename = req.file.originalname;
+    const ext = filename.toLowerCase().slice(filename.lastIndexOf("."));
+
+    if (ext !== ".pdf") {
+      return res.status(400).json({
+        success: false,
+        message: "This endpoint only accepts PDF files",
+      });
+    }
+
+    const pageRangesStr = req.body.pageRanges as string;
+    if (!pageRangesStr || pageRangesStr.trim() === "") {
+      return res.status(400).json({
+        success: false,
+        message: "Page ranges are required (e.g., '54-70' or '10, 15-20')",
+      });
+    }
+
+    const pageHints = parsePageRanges(pageRangesStr);
+    if (pageHints.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid page range format. Use formats like '54-70' or '10, 15-20, 25'",
+      });
+    }
+
+    // Parse existing registers from request body
+    let existingRegisters: ModbusRegister[] = [];
+    try {
+      if (req.body.existingRegisters) {
+        existingRegisters = JSON.parse(req.body.existingRegisters);
+      }
+    } catch {
+      // Ignore parse errors, start fresh
+    }
+
+    // Set up SSE
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    const sendProgress = (progress: PdfParseProgress) => {
+      res.write(`data: ${JSON.stringify({ type: "progress", ...progress })}\n\n`);
+    };
+
+    try {
+      const { registers, metadata } = await parsePdfWithPageHints(
+        req.file.buffer, 
+        pageHints, 
+        existingRegisters,
+        sendProgress
+      );
+
+      if (registers.length === 0) {
+        res.write(`data: ${JSON.stringify({ 
+          type: "error", 
+          message: "No Modbus registers found in the specified pages" 
+        })}\n\n`);
+        return res.end();
+      }
+
+      await storage.createDocument({
+        filename,
+        sourceFormat: "pdf" as ModbusSourceFormat,
+        registers,
+      });
+
+      const result: ConversionResult = {
+        success: true,
+        message: `Successfully extracted ${registers.length} registers from specified pages`,
         registers,
         sourceFormat: "pdf" as ModbusSourceFormat,
         filename,
