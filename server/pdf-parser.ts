@@ -39,8 +39,8 @@ if (typeof globalThis.DOMMatrix === "undefined") {
 // Use legacy build for Node.js compatibility
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 
-// Using claude-sonnet-4-20250514 as the latest model per Anthropic integration guidelines
-const DEFAULT_MODEL = "claude-sonnet-4-20250514";
+// Using Claude Opus 4.5 for highest quality PDF parsing
+const DEFAULT_MODEL = "claude-opus-4-20250514";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
