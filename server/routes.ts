@@ -65,7 +65,7 @@ export async function registerRoutes(
       // Handle PDF files separately
       if (ext === ".pdf") {
         try {
-          const registers = await parsePdfFile(req.file.buffer);
+          const { registers, metadata } = await parsePdfFile(req.file.buffer);
 
           if (registers.length === 0) {
             return res.status(400).json({
@@ -86,6 +86,7 @@ export async function registerRoutes(
             registers,
             sourceFormat: "pdf" as ModbusSourceFormat,
             filename,
+            extractionMetadata: metadata,
           };
 
           return res.json(result);
