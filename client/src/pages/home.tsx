@@ -9,12 +9,14 @@ import { PreviewPanel } from "@/components/preview-panel";
 import { DownloadSection } from "@/components/download-section";
 import { ExtractionFeedback } from "@/components/extraction-feedback";
 import { ExtractionGuide } from "@/components/extraction-guide";
+import { PageIdentifier } from "@/components/page-identifier";
+import { AnimatedProgress } from "@/components/animated-progress";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import type { ModbusRegister, ModbusFileFormat, ModbusSourceFormat, ConversionResult, ExtractionMetadata } from "@shared/schema";
 
-type ConversionStep = "upload" | "converting" | "preview";
+type ConversionStep = "upload" | "pageIdentify" | "converting" | "preview";
 
 interface PdfProgress {
   stage: "extracting" | "analyzing" | "parsing" | "complete" | "error";
@@ -34,18 +36,29 @@ export default function Home() {
   const [statusMessage, setStatusMessage] = useState<string>("");
   const [isPdfProcessing, setIsPdfProcessing] = useState(false);
   const [extractionMetadata, setExtractionMetadata] = useState<ExtractionMetadata | null>(null);
+  const [processingStartTime, setProcessingStartTime] = useState<number>(0);
 
-  const parsePdfWithProgress = useCallback(async (file: File) => {
+  const parsePdfWithProgress = useCallback(async (file: File, pageRanges?: string) => {
     setIsPdfProcessing(true);
     setStep("converting");
     setProgress(10);
+    setProcessingStartTime(Date.now());
     setStatusMessage("Uploading PDF...");
 
     try {
       const formData = new FormData();
       formData.append("file", file);
+      
+      const endpoint = pageRanges 
+        ? "/api/parse-pdf-with-hints" 
+        : "/api/parse-pdf-stream";
+      
+      if (pageRanges) {
+        formData.append("pageRanges", pageRanges);
+        formData.append("existingRegisters", JSON.stringify([]));
+      }
 
-      const response = await fetch("/api/parse-pdf-stream", {
+      const response = await fetch(endpoint, {
         method: "POST",
         body: formData,
       });
@@ -279,15 +292,16 @@ export default function Home() {
 
     const ext = selectedFile.name.split(".").pop()?.toLowerCase();
 
-    // Use streaming endpoint for PDF files
+    // For PDFs, show page identifier step first
     if (ext === "pdf") {
-      parsePdfWithProgress(selectedFile);
+      setStep("pageIdentify");
       return;
     }
 
     // Regular parsing for other file types
     setStep("converting");
     setProgress(10);
+    setProcessingStartTime(Date.now());
     setStatusMessage("Reading file...");
 
     const progressInterval = setInterval(() => {
@@ -309,7 +323,21 @@ export default function Home() {
     }, 800);
 
     parseMutation.mutate(selectedFile);
-  }, [selectedFile, parseMutation, parsePdfWithProgress]);
+  }, [selectedFile, parseMutation]);
+
+  const handleExtractPages = useCallback((pageRanges: string) => {
+    if (!selectedFile) return;
+    parsePdfWithProgress(selectedFile, pageRanges);
+  }, [selectedFile, parsePdfWithProgress]);
+
+  const handleExtractFullDocument = useCallback(() => {
+    if (!selectedFile) return;
+    parsePdfWithProgress(selectedFile);
+  }, [selectedFile, parsePdfWithProgress]);
+
+  const handleCancelPageIdentifier = useCallback(() => {
+    setStep("upload");
+  }, []);
 
   const handleClearAll = useCallback(() => {
     handleClearFile();
@@ -390,25 +418,22 @@ export default function Home() {
             </div>
           )}
 
+          {step === "pageIdentify" && selectedFile && (
+            <PageIdentifier
+              fileName={selectedFile.name}
+              onExtractPages={handleExtractPages}
+              onExtractFullDocument={handleExtractFullDocument}
+              onCancel={handleCancelPageIdentifier}
+            />
+          )}
+
           {step === "converting" && (
-            <div className="p-8 bg-card rounded-md border text-center space-y-4">
-              <div className="flex justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
-              </div>
-              <p className="text-lg font-medium text-foreground">
-                {sourceFormat === "pdf" ? "Processing your PDF document..." : "Processing your document..."}
-              </p>
-              <p className="text-muted-foreground">{statusMessage}</p>
-              <div className="max-w-xs mx-auto">
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-primary transition-all duration-300"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">{progress}% complete</p>
-              </div>
-            </div>
+            <AnimatedProgress
+              progress={progress}
+              statusMessage={statusMessage}
+              startTime={processingStartTime}
+              fileName={selectedFile?.name}
+            />
           )}
         </section>
 
