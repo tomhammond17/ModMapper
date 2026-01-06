@@ -92,6 +92,15 @@ export function ExtractionFeedback({ metadata }: ExtractionFeedbackProps) {
             {metadata.highRelevancePages} high-relevance pages found
           </span>
         </div>
+
+        {metadata.batchSummary && (
+          <div className="pt-2 border-t">
+            <p className="text-xs text-muted-foreground mb-1">Batch Details:</p>
+            <p className="text-xs font-mono bg-muted/50 p-2 rounded" data-testid="text-batch-summary">
+              {metadata.batchSummary}
+            </p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
