@@ -133,6 +133,7 @@ export default function Home() {
       setRegisters(data.registers);
       setSourceFormat(data.sourceFormat);
       setFilename(data.filename);
+      setExtractionMetadata(null);
       if (data.sourceFormat !== targetFormat && data.sourceFormat !== "pdf") {
         setStep("preview");
       } else {
