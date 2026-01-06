@@ -52,6 +52,7 @@ export interface ExtractionMetadata {
   confidenceLevel: "high" | "medium" | "low";
   highRelevancePages: number;
   processingTimeMs: number;
+  batchSummary?: string;
 }
 
 export interface ConversionResult {

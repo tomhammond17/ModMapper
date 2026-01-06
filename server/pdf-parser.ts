@@ -427,45 +427,55 @@ function extractRegistersFromMalformedJson(jsonText: string): Record<string, unk
 }
 
 // ============================================================================
-// Stage 4: Enhanced AI prompt for register extraction
+// Stage 4: Enhanced AI prompt for register extraction (batch-aware)
 // ============================================================================
 
-export async function parseModbusRegistersFromContext(
-  context: string
-): Promise<ModbusRegister[]> {
-  const prompt = `You are an expert at parsing Modbus register documentation from industrial equipment manuals.
+const BATCH_EXTRACTION_PROMPT = `You are an expert at parsing Modbus register documentation from industrial equipment manuals.
 
 CRITICAL INSTRUCTIONS:
 1. Output ONLY valid JSON - no explanations, no markdown code blocks, no comments
 2. Start your response with [ and end with ]
-3. Extract ALL registers you find - look for tables with addresses, names, data types
+3. Extract EVERY SINGLE register row you find - do not skip any
+4. Continue extracting until you have processed every row in the content
+
+COMMON TABLE FORMATS TO RECOGNIZE:
+
+Format 1 - Hex addresses with decimal register numbers:
+| 0x0063 | 1 | 0 | R 100 | Generator Average Voltage | Scaling: 1 V/bit |
+→ address: 100 (use the "R ###" decimal number), name: "Generator Average Voltage"
+
+Format 2 - R/W column with address:
+| R 100 | Generator Voltage | R | UINT16 |
+→ address: 100, writable: false (R = Read only)
+
+Format 3 - Simple decimal addresses:
+| 40100 | Temperature | Read/Write | INT16 |
+→ address: 40100, writable: true
+
+SPECIAL PATTERNS:
+- "R ###" or "Register ###" → Use the number as address
+- "0x00XX" hex values → These are often memory offsets, look for corresponding "R ###" column
+- "Ct" column with "1" or "2" → Register count (2 = 32-bit value)
+- Bullet symbols (●) → Often indicate feature availability, not writability
+- "R/W" or "R" column → R = Read only (writable: false), R/W = Read/Write (writable: true)
+
+DATA TYPE DETECTION:
+- Count "1" + no FLOAT mention → UINT16
+- Count "2" + power/energy data → INT32 or UINT32
+- "Scaling: 1 W/bit" with 32-bit → INT32
+- Temperature/analog data → Often UINT16 with scaling
 
 OUTPUT FORMAT - use this EXACT structure:
-[{"address": 40001, "name": "RegName", "datatype": "UINT16", "description": "desc", "writable": false}]
+[{"address": 100, "name": "Generator Average Voltage", "datatype": "UINT16", "description": "Scaling: 1 V/bit, Offset: 0 V, Range: 0-64255 V", "writable": false}]
 
-REGISTER ADDRESS HANDLING:
-- If addresses are given as small numbers (0, 1, 2...) or hex (0x0000), add 40001 to convert to Modbus holding register format
-- If addresses already include 40xxx prefix, use as-is
-- Coil addresses use 0xxxx format, input registers use 30xxx
+VALID DATATYPES: INT16, UINT16, INT32, UINT32, FLOAT32, FLOAT64, STRING, BOOL, COIL
 
-VALID DATATYPES: ${modbusDataTypes.join(", ")}
+If no registers found, output exactly: []`;
 
-TYPE MAPPINGS:
-- INT/INT16/SINT16/INTEGER → INT16
-- UINT/UINT16/WORD → UINT16  
-- INT32/SINT32/LONG → INT32
-- UINT32/DWORD/ULONG → UINT32
-- FLOAT/FLOAT32/REAL/SINGLE → FLOAT32
-- FLOAT64/DOUBLE/LREAL → FLOAT64
-- STRING/ASCII → STRING
-- BOOL/BOOLEAN/BIT → BOOL
-- COIL → COIL
-
-WRITABILITY: Look for "R/W", "RW", "Read/Write", "Write" → true; "R", "Read Only", "RO" → false
-
-SCALING/OFFSET: Include in description if present (e.g., "Temperature (scaling: 0.1 °C/bit, offset: -40)")
-
-If no registers found, output exactly: []
+export async function parseModbusRegistersFromContext(
+  context: string
+): Promise<ModbusRegister[]> {
+  const prompt = `${BATCH_EXTRACTION_PROMPT}
 
 DOCUMENT CONTENT:
 ${context}`;
@@ -614,8 +624,10 @@ function normalizeDataType(value: string): ModbusDataType {
 }
 
 // ============================================================================
-// Main entry point: Intelligent PDF parsing pipeline
+// Main entry point: Batch-based PDF parsing pipeline
 // ============================================================================
+
+const PAGES_PER_BATCH = 4; // Process 4 pages at a time for balance of cost vs. accuracy
 
 function calculateConfidenceLevel(
   registersFound: number,
@@ -624,9 +636,80 @@ function calculateConfidenceLevel(
 ): "high" | "medium" | "low" {
   const pageRatio = highRelevancePages / Math.max(totalPages, 1);
   
-  if (registersFound >= 20 && pageRatio >= 0.1) return "high";
-  if (registersFound >= 5 && highRelevancePages >= 3) return "medium";
+  if (registersFound >= 50 && pageRatio >= 0.1) return "high";
+  if (registersFound >= 20 && highRelevancePages >= 3) return "medium";
   return "low";
+}
+
+interface BatchResult {
+  batchNum: number;
+  pageRange: string;
+  registersFound: number;
+  registers: ModbusRegister[];
+}
+
+async function extractBatch(
+  pages: PageData[],
+  batchNum: number,
+  hints: DocumentHint[]
+): Promise<BatchResult> {
+  const pageNums = pages.map(p => p.pageNum);
+  const pageRange = pageNums.length === 1 
+    ? `${pageNums[0]}` 
+    : `${pageNums[0]}-${pageNums[pageNums.length - 1]}`;
+  
+  // Build context for this batch
+  let context = "";
+  
+  if (hints.length > 0 && batchNum === 1) {
+    context += "DOCUMENT CONVENTIONS:\n" + 
+      hints.slice(0, 3).map(h => `- ${h.type}: ${h.context}`).join("\n") + "\n\n";
+  }
+  
+  for (const page of pages) {
+    context += `--- PAGE ${page.pageNum} ---\n`;
+    if (page.sectionTitle) {
+      context += `[${page.sectionTitle}]\n`;
+    }
+    context += page.text + "\n\n";
+  }
+  
+  console.log(`[Batch ${batchNum}] Processing pages ${pageRange} (${context.length} chars)`);
+  
+  const registers = await parseModbusRegistersFromContext(context);
+  
+  console.log(`[Batch ${batchNum}] Extracted ${registers.length} registers from pages ${pageRange}`);
+  
+  return {
+    batchNum,
+    pageRange,
+    registersFound: registers.length,
+    registers,
+  };
+}
+
+function mergeAndDeduplicateRegisters(allRegisters: ModbusRegister[]): ModbusRegister[] {
+  const seenAddresses = new Map<number, ModbusRegister>();
+  
+  for (const reg of allRegisters) {
+    const existing = seenAddresses.get(reg.address);
+    if (!existing) {
+      seenAddresses.set(reg.address, reg);
+    } else {
+      // Keep the one with more complete data
+      const existingScore = (existing.name.length > 15 ? 1 : 0) + 
+                           (existing.description.length > 10 ? 1 : 0);
+      const newScore = (reg.name.length > 15 ? 1 : 0) + 
+                      (reg.description.length > 10 ? 1 : 0);
+      if (newScore > existingScore) {
+        seenAddresses.set(reg.address, reg);
+      }
+    }
+  }
+  
+  const merged = Array.from(seenAddresses.values());
+  merged.sort((a, b) => a.address - b.address);
+  return merged;
 }
 
 export async function parsePdfFile(
@@ -639,7 +722,7 @@ export async function parsePdfFile(
     // Stage 1: Extract pages
     onProgress?.({
       stage: "extracting",
-      progress: 15,
+      progress: 10,
       message: "Extracting text from PDF pages...",
     });
 
@@ -653,7 +736,7 @@ export async function parsePdfFile(
     
     onProgress?.({
       stage: "extracting",
-      progress: 25,
+      progress: 15,
       message: `Extracted ${totalPages} pages from PDF`,
       details: `Found ${hints.length} document hints`,
     });
@@ -661,51 +744,106 @@ export async function parsePdfFile(
     // Stage 2: Score and rank pages
     onProgress?.({
       stage: "scoring",
-      progress: 35,
+      progress: 20,
       message: "Analyzing page relevance...",
     });
 
     const rankedPages = scorePages(pages);
-    const highPages = rankedPages.filter(p => p.score > 8);
-    const medPages = rankedPages.filter(p => p.score > 3 && p.score <= 8);
-    const pagesAnalyzed = highPages.length + medPages.length;
+    const highPages = rankedPages.filter(p => p.score > 5);
+    const medPages = rankedPages.filter(p => p.score > 2 && p.score <= 5);
+    
+    // Select pages to process: all high + medium relevance pages
+    const pagesToProcess = [...highPages, ...medPages];
+    
+    // Sort by page number for sequential processing
+    pagesToProcess.sort((a, b) => a.pageNum - b.pageNum);
+    
+    const pagesAnalyzed = pagesToProcess.length;
     
     onProgress?.({
       stage: "scoring",
-      progress: 45,
-      message: `Found ${highPages.length} high-relevance pages`,
-      details: `${medPages.length} medium, ${rankedPages.length - highPages.length - medPages.length} low`,
+      progress: 25,
+      message: `Found ${pagesAnalyzed} relevant pages to process`,
+      details: `${highPages.length} high-relevance, ${medPages.length} medium-relevance`,
     });
 
-    // Stage 3: Assemble context
-    onProgress?.({
-      stage: "analyzing",
-      progress: 55,
-      message: "Preparing document context for AI...",
-    });
-
-    const context = assembleExtractionContext(rankedPages, hints, 80000);
-    
-    if (context.length < 100) {
-      throw new Error("Could not find sufficient register-related content in the PDF.");
+    if (pagesToProcess.length === 0) {
+      throw new Error("Could not find any pages with register-related content in the PDF.");
     }
 
-    // Stage 4: AI extraction
+    // Stage 3: Batch processing
+    const batches: PageData[][] = [];
+    for (let i = 0; i < pagesToProcess.length; i += PAGES_PER_BATCH) {
+      batches.push(pagesToProcess.slice(i, i + PAGES_PER_BATCH));
+    }
+    
+    const totalBatches = batches.length;
+    const allRegisters: ModbusRegister[] = [];
+    const batchResults: BatchResult[] = [];
+    
     onProgress?.({
       stage: "parsing",
-      progress: 70,
-      message: "Extracting registers with AI...",
-      details: `Sending ${Math.round(context.length / 1000)}KB to Claude`,
+      progress: 30,
+      message: `Processing ${pagesAnalyzed} pages in ${totalBatches} batches...`,
+      details: `Batch size: ${PAGES_PER_BATCH} pages`,
     });
 
-    const registers = await parseModbusRegistersFromContext(context);
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i];
+      const batchNum = i + 1;
+      const progressPercent = 30 + Math.round((i / totalBatches) * 60);
+      
+      const pageNums = batch.map(p => p.pageNum);
+      const pageRange = pageNums.length === 1 
+        ? `${pageNums[0]}` 
+        : `${pageNums[0]}-${pageNums[pageNums.length - 1]}`;
+      
+      onProgress?.({
+        stage: "parsing",
+        progress: progressPercent,
+        message: `Batch ${batchNum}/${totalBatches}: Processing pages ${pageRange}...`,
+        details: `${allRegisters.length} registers found so far`,
+      });
+      
+      try {
+        const result = await extractBatch(batch, batchNum, hints);
+        batchResults.push(result);
+        allRegisters.push(...result.registers);
+        
+        onProgress?.({
+          stage: "parsing",
+          progress: progressPercent + 5,
+          message: `Batch ${batchNum}/${totalBatches}: Found ${result.registersFound} registers`,
+          details: `Pages ${pageRange} complete. Total: ${allRegisters.length} registers`,
+        });
+      } catch (batchError) {
+        console.error(`[Batch ${batchNum}] Error:`, batchError);
+        // Continue with other batches even if one fails
+      }
+    }
+
+    // Stage 4: Merge and deduplicate
+    onProgress?.({
+      stage: "parsing",
+      progress: 92,
+      message: "Merging and deduplicating registers...",
+      details: `Processing ${allRegisters.length} total extracted registers`,
+    });
+
+    const registers = mergeAndDeduplicateRegisters(allRegisters);
     const processingTimeMs = Date.now() - startTime;
 
     onProgress?.({
-      stage: "parsing",
-      progress: 90,
-      message: `Found ${registers.length} registers`,
+      stage: "complete",
+      progress: 100,
+      message: `Extraction complete: ${registers.length} unique registers`,
+      details: `Processed ${pagesAnalyzed} pages in ${totalBatches} batches`,
     });
+
+    // Build batch summary for metadata
+    const batchSummary = batchResults.map(b => 
+      `Pages ${b.pageRange}: ${b.registersFound} registers`
+    ).join("; ");
 
     const metadata: ExtractionMetadata = {
       totalPages,
@@ -714,6 +852,7 @@ export async function parsePdfFile(
       highRelevancePages: highPages.length,
       confidenceLevel: calculateConfidenceLevel(registers.length, highPages.length, totalPages),
       processingTimeMs,
+      batchSummary,
     };
 
     return { registers, metadata };

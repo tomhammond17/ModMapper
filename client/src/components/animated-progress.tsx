@@ -11,12 +11,12 @@ interface ProgressStage {
 }
 
 const PROGRESS_STAGES: ProgressStage[] = [
-  { icon: FileSearch, message: "Analyzing document structure...", color: "text-blue-500" },
-  { icon: Brain, message: "Identifying high-relevance pages...", color: "text-purple-500" },
-  { icon: FileText, message: "Extracting page content...", color: "text-amber-500" },
-  { icon: Database, message: "Processing register data...", color: "text-green-500" },
-  { icon: Brain, message: "Validating extracted registers...", color: "text-indigo-500" },
-  { icon: CheckCircle2, message: "Finalizing results...", color: "text-emerald-500" },
+  { icon: FileSearch, message: "Extracting text from PDF...", color: "text-blue-500" },
+  { icon: Brain, message: "Analyzing page relevance...", color: "text-purple-500" },
+  { icon: FileText, message: "Processing batch...", color: "text-amber-500" },
+  { icon: Database, message: "Extracting registers...", color: "text-green-500" },
+  { icon: Brain, message: "Merging results...", color: "text-indigo-500" },
+  { icon: CheckCircle2, message: "Finalizing...", color: "text-emerald-500" },
 ];
 
 interface AnimatedProgressProps {
@@ -118,13 +118,14 @@ export function AnimatedProgress({
           </motion.div>
         </AnimatePresence>
 
-        {statusMessage && statusMessage !== currentStage.message && (
+        {statusMessage && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center"
+            key={statusMessage}
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center space-y-1 p-3 rounded-md bg-muted/50"
           >
-            <p className="text-sm text-muted-foreground">{statusMessage}</p>
+            <p className="text-sm font-medium">{statusMessage}</p>
           </motion.div>
         )}
 
