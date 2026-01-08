@@ -284,7 +284,13 @@ export async function registerRoutes(
 
     const sendProgress = (progress: PdfParseProgress) => {
       if (sse.isActive()) {
-        sse.sendProgress(progress.progress, progress.message, progress.details);
+        sse.sendProgress(progress.progress, progress.message, progress.details, {
+          stage: progress.stage,
+          totalBatches: progress.totalBatches,
+          currentBatch: progress.currentBatch,
+          totalPages: progress.totalPages,
+          pagesProcessed: progress.pagesProcessed,
+        });
       }
     };
 
@@ -370,7 +376,13 @@ export async function registerRoutes(
 
     const sendProgress = (progress: PdfParseProgress) => {
       if (sse.isActive()) {
-        sse.sendProgress(progress.progress, progress.message, progress.details);
+        sse.sendProgress(progress.progress, progress.message, progress.details, {
+          stage: progress.stage,
+          totalBatches: progress.totalBatches,
+          currentBatch: progress.currentBatch,
+          totalPages: progress.totalPages,
+          pagesProcessed: progress.pagesProcessed,
+        });
       }
     };
 

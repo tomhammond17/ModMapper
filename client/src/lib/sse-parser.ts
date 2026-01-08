@@ -3,6 +3,11 @@ export interface SSEProgressEvent {
   progress: number;
   message: string;
   details?: string;
+  stage?: string;
+  totalBatches?: number;
+  currentBatch?: number;
+  totalPages?: number;
+  pagesProcessed?: number;
 }
 
 export interface SSECompleteEvent<T> {
@@ -17,8 +22,16 @@ export interface SSEErrorEvent {
 
 export type SSEEvent<T> = SSEProgressEvent | SSECompleteEvent<T> | SSEErrorEvent;
 
+export interface SSEProgressData {
+  stage?: string;
+  totalBatches?: number;
+  currentBatch?: number;
+  totalPages?: number;
+  pagesProcessed?: number;
+}
+
 export interface SSECallbacks<T> {
-  onProgress: (progress: number, message: string) => void;
+  onProgress: (progress: number, message: string, extra?: SSEProgressData) => void;
   onComplete: (result: T) => void;
   onError: (error: Error) => void;
 }
@@ -42,7 +55,13 @@ export async function parseSSEStream<T>(
         const data = JSON.parse(line.slice(6)) as SSEEvent<T>;
 
         if (data.type === "progress") {
-          callbacks.onProgress(data.progress, data.message);
+          callbacks.onProgress(data.progress, data.message, {
+            stage: data.stage,
+            totalBatches: data.totalBatches,
+            currentBatch: data.currentBatch,
+            totalPages: data.totalPages,
+            pagesProcessed: data.pagesProcessed,
+          });
         } else if (data.type === "complete") {
           callbacks.onComplete(data.result);
         } else if (data.type === "error") {

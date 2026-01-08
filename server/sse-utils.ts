@@ -6,9 +6,17 @@ const DEFAULT_SSE_TIMEOUT_MS = 5 * 60 * 1000;
 // Heartbeat interval to keep connection alive (30 seconds)
 const HEARTBEAT_INTERVAL_MS = 30 * 1000;
 
+export interface SSEProgressData {
+  stage?: string;
+  totalBatches?: number;
+  currentBatch?: number;
+  totalPages?: number;
+  pagesProcessed?: number;
+}
+
 export interface SSEConnection {
   send: (event: string, data: Record<string, unknown>) => void;
-  sendProgress: (progress: number, message: string, details?: string) => void;
+  sendProgress: (progress: number, message: string, details?: string, extra?: SSEProgressData) => void;
   sendComplete: (result: unknown) => void;
   sendError: (message: string) => void;
   end: () => void;
@@ -102,14 +110,15 @@ export function createSSEConnection(
       }
     },
 
-    sendProgress: (progress: number, message: string, details?: string) => {
+    sendProgress: (progress: number, message: string, details?: string, extra?: SSEProgressData) => {
       if (isConnectionActive) {
         try {
           res.write(`data: ${JSON.stringify({
             type: "progress",
             progress,
             message,
-            details
+            details,
+            ...extra
           })}\n\n`);
         } catch {
           cleanup();

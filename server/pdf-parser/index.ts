@@ -137,6 +137,12 @@ export async function parsePdfFile(
 
     // PASS 1: Memory-efficient scoring
     onProgress?.({
+      stage: "uploading",
+      progress: 5,
+      message: "Uploading PDF...",
+    });
+
+    onProgress?.({
       stage: "scoring",
       progress: 10,
       message: "Analyzing PDF pages for relevance...",
@@ -156,6 +162,7 @@ export async function parsePdfFile(
       progress: 20,
       message: `Scored ${totalPages} pages`,
       details: `Found ${hints.length} document hints`,
+      totalPages,
     });
 
     // Select relevant pages based on scores
@@ -178,6 +185,8 @@ export async function parsePdfFile(
       progress: 25,
       message: `Found ${pagesAnalyzed} relevant pages to process`,
       details: `${highPages.length} high, ${medPages.length} medium, ${lowPagesWithTables.length} table-only`,
+      totalPages,
+      pagesProcessed: pagesAnalyzed,
     });
 
     if (pagesAnalyzed === 0) {
@@ -189,6 +198,8 @@ export async function parsePdfFile(
       stage: "extracting",
       progress: 28,
       message: `Extracting ${pagesAnalyzed} relevant pages...`,
+      totalPages,
+      pagesProcessed: pagesAnalyzed,
     });
 
     const pagesToProcess = await extractSpecificPages(buffer, Array.from(pageNumbersToExtract));
@@ -197,6 +208,8 @@ export async function parsePdfFile(
       stage: "extracting",
       progress: 30,
       message: `Extracted ${pagesToProcess.length} pages for processing`,
+      totalPages,
+      pagesProcessed: pagesToProcess.length,
     });
 
     // PASS 3: Batch processing with LLM
@@ -214,6 +227,10 @@ export async function parsePdfFile(
       progress: 32,
       message: `Processing ${pagesAnalyzed} pages in ${totalBatches} batches...`,
       details: `Batch size: ${PAGES_PER_BATCH} pages`,
+      totalBatches,
+      currentBatch: 0,
+      totalPages,
+      pagesProcessed: pagesAnalyzed,
     });
 
     for (let i = 0; i < batches.length; i++) {
@@ -230,10 +247,14 @@ export async function parsePdfFile(
         : `${pageNums[0]}-${pageNums[pageNums.length - 1]}`;
 
       onProgress?.({
-        stage: "parsing",
+        stage: "analyzing",
         progress: progressPercent,
         message: `Batch ${batchNum}/${totalBatches}: Processing pages ${pageRange}...`,
         details: `${allRegisters.length} registers found so far`,
+        totalBatches,
+        currentBatch: batchNum,
+        totalPages,
+        pagesProcessed: pagesAnalyzed,
       });
 
       try {
@@ -245,10 +266,14 @@ export async function parsePdfFile(
         batches[i] = [];
 
         onProgress?.({
-          stage: "parsing",
+          stage: "analyzing",
           progress: progressPercent + 5,
           message: `Batch ${batchNum}/${totalBatches}: Found ${result.registersFound} registers`,
           details: `Pages ${pageRange} complete. Total: ${allRegisters.length} registers`,
+          totalBatches,
+          currentBatch: batchNum,
+          totalPages,
+          pagesProcessed: pagesAnalyzed,
         });
       } catch (batchError) {
         // Re-throw AbortErrors to stop processing
@@ -266,6 +291,10 @@ export async function parsePdfFile(
       progress: 92,
       message: "Merging and deduplicating registers...",
       details: `Processing ${allRegisters.length} total extracted registers`,
+      totalBatches,
+      currentBatch: totalBatches,
+      totalPages,
+      pagesProcessed: pagesAnalyzed,
     });
 
     const registers = mergeAndDeduplicateRegisters(allRegisters);
@@ -276,6 +305,10 @@ export async function parsePdfFile(
       progress: 100,
       message: `Extraction complete: ${registers.length} unique registers`,
       details: `Processed ${pagesAnalyzed} pages in ${totalBatches} batches`,
+      totalBatches,
+      currentBatch: totalBatches,
+      totalPages,
+      pagesProcessed: pagesAnalyzed,
     });
 
     // Build batch summary for metadata
@@ -355,6 +388,12 @@ export async function parsePdfWithPageHints(
     checkAborted(signal);
 
     onProgress?.({
+      stage: "uploading",
+      progress: 5,
+      message: "Uploading PDF...",
+    });
+
+    onProgress?.({
       stage: "extracting",
       progress: 10,
       message: "Extracting specified pages...",
@@ -413,6 +452,8 @@ export async function parsePdfWithPageHints(
       stage: "extracting",
       progress: 15,
       message: `Found ${targetPages.length} pages in specified ranges`,
+      totalPages,
+      pagesProcessed: targetPages.length,
     });
 
     // Process in batches
@@ -429,6 +470,10 @@ export async function parsePdfWithPageHints(
       stage: "parsing",
       progress: 20,
       message: `Processing ${targetPages.length} pages in ${totalBatches} batches...`,
+      totalBatches,
+      currentBatch: 0,
+      totalPages,
+      pagesProcessed: targetPages.length,
     });
 
     for (let i = 0; i < batches.length; i++) {
@@ -445,10 +490,14 @@ export async function parsePdfWithPageHints(
         : `${pageNums[0]}-${pageNums[pageNums.length - 1]}`;
       
       onProgress?.({
-        stage: "parsing",
+        stage: "analyzing",
         progress: progressPercent,
         message: `Batch ${batchNum}/${totalBatches}: Processing pages ${pageRange}...`,
         details: `${allRegisters.length} registers found so far`,
+        totalBatches,
+        currentBatch: batchNum,
+        totalPages,
+        pagesProcessed: targetPages.length,
       });
       
       try {
@@ -457,10 +506,14 @@ export async function parsePdfWithPageHints(
         allRegisters.push(...result.registers);
         
         onProgress?.({
-          stage: "parsing",
+          stage: "analyzing",
           progress: progressPercent + 5,
           message: `Batch ${batchNum}/${totalBatches}: Found ${result.registersFound} registers`,
           details: `Pages ${pageRange} complete. Total: ${allRegisters.length} registers`,
+          totalBatches,
+          currentBatch: batchNum,
+          totalPages,
+          pagesProcessed: targetPages.length,
         });
       } catch (batchError) {
         // Re-throw AbortErrors to stop processing

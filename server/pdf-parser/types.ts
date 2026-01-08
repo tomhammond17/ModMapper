@@ -16,10 +16,18 @@ export interface PdfExtractionResult {
  * Progress update during PDF parsing.
  */
 export interface PdfParseProgress {
-  stage: "extracting" | "scoring" | "analyzing" | "parsing" | "complete" | "error";
+  stage: "uploading" | "extracting" | "scoring" | "analyzing" | "parsing" | "complete" | "error";
   progress: number;
   message: string;
   details?: string;
+  /** Total number of batches to process */
+  totalBatches?: number;
+  /** Current batch being processed (1-indexed) */
+  currentBatch?: number;
+  /** Total pages in the PDF */
+  totalPages?: number;
+  /** Number of pages being processed */
+  pagesProcessed?: number;
 }
 
 /**
