@@ -240,24 +240,21 @@ export async function registerRoutes(
 
     // Create abort controller for cancellation support
     const abortController = new AbortController();
-    
-    // Abort processing if client disconnects
-    req.on("close", () => {
-      if (!res.writableEnded) {
-        log.info("Client disconnected, aborting PDF processing", { filename });
-        abortController.abort();
-      }
-    });
 
     // Check cache before starting SSE
     const cacheKey = pdfCache.getHash(req.file!.buffer);
     const cached = pdfCache.get(cacheKey);
 
     // Set up SSE with timeout (5 minutes default)
+    // Use res.on("close") via SSE utility to detect client disconnect (not req.on("close"))
     const sse = createSSEConnection(res, {
       timeoutMs: SSE_CONFIG.DEFAULT_TIMEOUT_MS,
       onTimeout: () => {
         log.warn("SSE timeout during PDF parsing", { filename });
+        abortController.abort();
+      },
+      onClose: () => {
+        log.info("Client disconnected, aborting PDF processing", { filename });
         abortController.abort();
       },
     });
@@ -347,14 +344,6 @@ export async function registerRoutes(
     // Create abort controller for cancellation support
     const abortController = new AbortController();
 
-    // Abort processing if client disconnects
-    req.on("close", () => {
-      if (!res.writableEnded) {
-        log.info("Client disconnected, aborting PDF processing with hints", { filename });
-        abortController.abort();
-      }
-    });
-
     // Parse existing registers from request body
     let existingRegisters: ModbusRegister[] = [];
     try {
@@ -366,10 +355,15 @@ export async function registerRoutes(
     }
 
     // Set up SSE with timeout (5 minutes default)
+    // Use res.on("close") via SSE utility to detect client disconnect (not req.on("close"))
     const sse = createSSEConnection(res, {
       timeoutMs: SSE_CONFIG.DEFAULT_TIMEOUT_MS,
       onTimeout: () => {
         log.warn("SSE timeout during PDF parsing with hints", { filename });
+        abortController.abort();
+      },
+      onClose: () => {
+        log.info("Client disconnected, aborting PDF processing with hints", { filename });
         abortController.abort();
       },
     });
