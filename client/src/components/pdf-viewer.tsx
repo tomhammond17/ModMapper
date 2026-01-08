@@ -69,11 +69,32 @@ export function PdfViewer({
   const textLayerRef = useRef<HTMLDivElement>(null);
   const thumbnailQueueRef = useRef<number[]>([]);
   const isRenderingThumbnailsRef = useRef(false);
+  const isOpenRef = useRef(open);
+  const currentFileRef = useRef<File | null>(null);
+
+  useEffect(() => {
+    isOpenRef.current = open;
+  }, [open]);
+
+  useEffect(() => {
+    if (file !== currentFileRef.current) {
+      currentFileRef.current = file;
+      setSelectedPages(new Set());
+    }
+  }, [file]);
 
   useEffect(() => {
     if (!file || !open) return;
 
     let cancelled = false;
+
+    if (pdfDoc) {
+      pdfDoc.destroy();
+      setPdfDoc(null);
+    }
+    thumbnailQueueRef.current = [];
+    isRenderingThumbnailsRef.current = false;
+    setThumbnails(new Map());
 
     const loadPdf = async () => {
       setLoading(true);
@@ -87,7 +108,6 @@ export function PdfViewer({
         setPdfDoc(doc);
         setNumPages(doc.numPages);
         setCurrentPage(1);
-        setThumbnails(new Map());
         setSearchResults([]);
         setSearchQuery("");
       } catch (error) {
@@ -127,8 +147,10 @@ export function PdfViewer({
 
     isRenderingThumbnailsRef.current = true;
 
-    while (thumbnailQueueRef.current.length > 0) {
+    while (thumbnailQueueRef.current.length > 0 && isOpenRef.current) {
       const pageNum = thumbnailQueueRef.current.shift()!;
+      
+      if (!isOpenRef.current) break;
 
       setThumbnails((prev) => {
         const newMap = new Map(prev);
