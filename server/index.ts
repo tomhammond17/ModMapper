@@ -32,8 +32,13 @@ app.use(compression({
   level: 6,
   // Filter function to determine if response should be compressed
   filter: (req, res) => {
-    // Don't compress SSE streams
-    if (req.path.includes("stream") || req.path.includes("pdf-stream")) {
+    // Don't compress SSE streams - these need real-time delivery
+    const contentType = res.getHeader("Content-Type");
+    if (contentType && String(contentType).includes("text/event-stream")) {
+      return false;
+    }
+    // Also check paths for SSE endpoints
+    if (req.path.includes("stream") || req.path.includes("pdf-stream") || req.path.includes("pdf-with-hints")) {
       return false;
     }
     // Use default filter for everything else

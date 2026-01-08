@@ -13,8 +13,8 @@ interface StageConfig {
 
 const STAGES: StageConfig[] = [
   { id: "uploading", label: "Uploading", icon: Upload },
-  { id: "extracting", label: "Extracting Text", icon: FileSearch },
   { id: "scoring", label: "Scoring Pages", icon: FileSearch },
+  { id: "extracting", label: "Extracting Text", icon: FileSearch },
   { id: "analyzing", label: "Analyzing with AI", icon: Brain },
   { id: "parsing", label: "Parsing Results", icon: FileText },
   { id: "complete", label: "Complete", icon: CheckCircle2 },

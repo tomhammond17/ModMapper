@@ -104,6 +104,10 @@ export function createSSEConnection(
       if (isConnectionActive) {
         try {
           res.write(`data: ${JSON.stringify({ type: event, ...data })}\n\n`);
+          // Explicitly flush to ensure real-time delivery
+          if (typeof (res as NodeJS.WritableStream & { flush?: () => void }).flush === "function") {
+            (res as NodeJS.WritableStream & { flush: () => void }).flush();
+          }
         } catch {
           cleanup();
         }
@@ -120,6 +124,10 @@ export function createSSEConnection(
             details,
             ...extra
           })}\n\n`);
+          // Explicitly flush to ensure real-time delivery
+          if (typeof (res as NodeJS.WritableStream & { flush?: () => void }).flush === "function") {
+            (res as NodeJS.WritableStream & { flush: () => void }).flush();
+          }
         } catch {
           cleanup();
         }
