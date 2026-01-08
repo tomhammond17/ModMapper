@@ -267,6 +267,10 @@ export default function Home() {
               startTime={processingState.startTime}
               fileName={selectedFile?.name}
               onCancel={cancelProcessing}
+              stage={processingState.stage}
+              totalBatches={processingState.totalBatches}
+              currentBatch={processingState.currentBatch}
+              pagesProcessed={processingState.pagesProcessed}
             />
           )}
         </section>

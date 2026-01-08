@@ -1,8 +1,10 @@
 import { useReducer, useCallback, useRef } from "react";
-import { parseSSEStream } from "@/lib/sse-parser";
+import { parseSSEStream, type SSEProgressData } from "@/lib/sse-parser";
 import type { ConversionResult, ModbusRegister } from "@shared/schema";
 
 export type ConversionStep = "upload" | "pageIdentify" | "converting" | "preview";
+
+export type ProcessingStage = "uploading" | "extracting" | "scoring" | "analyzing" | "parsing" | "complete" | "error";
 
 interface ProcessingState {
   step: ConversionStep;
@@ -10,6 +12,11 @@ interface ProcessingState {
   statusMessage: string;
   isProcessing: boolean;
   startTime: number;
+  stage: ProcessingStage;
+  totalBatches: number;
+  currentBatch: number;
+  totalPages: number;
+  pagesProcessed: number;
 }
 
 /**
@@ -21,7 +28,7 @@ function isAbortError(error: unknown): boolean {
 
 type ProcessingAction =
   | { type: "START_PROCESSING"; message?: string }
-  | { type: "UPDATE_PROGRESS"; progress: number; message: string }
+  | { type: "UPDATE_PROGRESS"; progress: number; message: string; extra?: SSEProgressData }
   | { type: "COMPLETE" }
   | { type: "ERROR" }
   | { type: "SET_STEP"; step: ConversionStep }
@@ -33,6 +40,11 @@ const initialState: ProcessingState = {
   statusMessage: "",
   isProcessing: false,
   startTime: 0,
+  stage: "uploading",
+  totalBatches: 0,
+  currentBatch: 0,
+  totalPages: 0,
+  pagesProcessed: 0,
 };
 
 function processingReducer(state: ProcessingState, action: ProcessingAction): ProcessingState {
@@ -51,6 +63,11 @@ function processingReducer(state: ProcessingState, action: ProcessingAction): Pr
         ...state,
         progress: action.progress,
         statusMessage: action.message,
+        stage: (action.extra?.stage as ProcessingStage) || state.stage,
+        totalBatches: action.extra?.totalBatches ?? state.totalBatches,
+        currentBatch: action.extra?.currentBatch ?? state.currentBatch,
+        totalPages: action.extra?.totalPages ?? state.totalPages,
+        pagesProcessed: action.extra?.pagesProcessed ?? state.pagesProcessed,
       };
     case "COMPLETE":
       return {
@@ -140,8 +157,8 @@ export function usePdfProcessing(): UsePdfProcessingResult {
         let result: ConversionResult | null = null;
 
         await parseSSEStream<ConversionResult>(response, {
-          onProgress: (progress, message) => {
-            dispatch({ type: "UPDATE_PROGRESS", progress, message });
+          onProgress: (progress, message, extra) => {
+            dispatch({ type: "UPDATE_PROGRESS", progress, message, extra });
           },
           onComplete: (data) => {
             result = data;

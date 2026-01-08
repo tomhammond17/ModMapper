@@ -1,43 +1,53 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Loader2, FileSearch, Brain, FileText, Database, CheckCircle2, Clock, XCircle } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Loader2, Upload, FileSearch, Brain, FileText, CheckCircle2, XCircle, Info } from "lucide-react";
+import { motion } from "framer-motion";
+import type { ProcessingStage } from "@/hooks/use-pdf-processing";
 
-interface ProgressStage {
+interface StageConfig {
+  id: ProcessingStage;
+  label: string;
   icon: typeof FileSearch;
-  message: string;
-  color: string;
 }
 
-const PROGRESS_STAGES: ProgressStage[] = [
-  { icon: FileSearch, message: "Extracting text from PDF...", color: "text-blue-500" },
-  { icon: Brain, message: "Analyzing page relevance...", color: "text-purple-500" },
-  { icon: FileText, message: "Processing batch...", color: "text-amber-500" },
-  { icon: Database, message: "Extracting registers...", color: "text-green-500" },
-  { icon: Brain, message: "Merging results...", color: "text-indigo-500" },
-  { icon: CheckCircle2, message: "Finalizing...", color: "text-emerald-500" },
+const STAGES: StageConfig[] = [
+  { id: "uploading", label: "Uploading", icon: Upload },
+  { id: "extracting", label: "Extracting Text", icon: FileSearch },
+  { id: "scoring", label: "Scoring Pages", icon: FileSearch },
+  { id: "analyzing", label: "Analyzing with AI", icon: Brain },
+  { id: "parsing", label: "Parsing Results", icon: FileText },
+  { id: "complete", label: "Complete", icon: CheckCircle2 },
 ];
+
+function getStageIndex(stage: ProcessingStage): number {
+  const idx = STAGES.findIndex(s => s.id === stage);
+  return idx >= 0 ? idx : 0;
+}
 
 interface AnimatedProgressProps {
   progress: number;
   statusMessage: string;
   startTime: number;
   fileName?: string;
-  /** Optional callback to cancel the current operation */
   onCancel?: () => void;
+  stage: ProcessingStage;
+  totalBatches: number;
+  currentBatch: number;
+  pagesProcessed: number;
 }
 
 export function AnimatedProgress({ 
-  progress, 
-  statusMessage, 
+  statusMessage,
   startTime,
   fileName,
   onCancel,
+  stage,
+  totalBatches,
+  currentBatch,
+  pagesProcessed,
 }: AnimatedProgressProps) {
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [currentStageIndex, setCurrentStageIndex] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -45,22 +55,6 @@ export function AnimatedProgress({
     }, 1000);
     return () => clearInterval(interval);
   }, [startTime]);
-
-  useEffect(() => {
-    if (progress < 20) {
-      setCurrentStageIndex(0);
-    } else if (progress < 40) {
-      setCurrentStageIndex(1);
-    } else if (progress < 60) {
-      setCurrentStageIndex(2);
-    } else if (progress < 80) {
-      setCurrentStageIndex(3);
-    } else if (progress < 95) {
-      setCurrentStageIndex(4);
-    } else {
-      setCurrentStageIndex(5);
-    }
-  }, [progress]);
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -71,11 +65,10 @@ export function AnimatedProgress({
     return `${secs}s`;
   };
 
-  const currentStage = PROGRESS_STAGES[currentStageIndex];
-  const StageIcon = currentStage.icon;
+  const currentStageIndex = getStageIndex(stage);
 
   return (
-    <Card className="max-w-xl mx-auto overflow-visible">
+    <Card className="max-w-xl mx-auto overflow-visible" data-testid="card-processing-progress">
       <CardContent className="pt-6 space-y-6">
         <div className="text-center space-y-2">
           <motion.div 
@@ -89,55 +82,105 @@ export function AnimatedProgress({
           </motion.div>
           
           {fileName && (
-            <p className="text-sm text-muted-foreground truncate max-w-md mx-auto">
+            <p className="text-sm text-muted-foreground truncate max-w-md mx-auto" data-testid="text-processing-filename">
               {fileName}
             </p>
           )}
         </div>
 
-        <div className="space-y-3">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Progress</span>
-            <span className="font-mono font-medium">{Math.round(progress)}%</span>
-          </div>
-          <Progress value={progress} className="h-2" />
-        </div>
+        <div className="space-y-4">
+          {STAGES.slice(0, -1).map((stageConfig, index) => {
+            const isCompleted = index < currentStageIndex;
+            const isCurrent = index === currentStageIndex;
+            const isPending = index > currentStageIndex;
+            const StageIcon = stageConfig.icon;
 
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentStageIndex}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.3 }}
-            className="flex items-center justify-center gap-3 py-3"
-          >
-            <motion.div
-              animate={{ scale: [1, 1.1, 1] }}
-              transition={{ duration: 1.5, repeat: Infinity }}
-            >
-              <StageIcon className={`h-5 w-5 ${currentStage.color}`} />
-            </motion.div>
-            <span className="text-sm font-medium">{currentStage.message}</span>
-          </motion.div>
-        </AnimatePresence>
+            return (
+              <div 
+                key={stageConfig.id} 
+                className="flex items-center gap-3"
+                data-testid={`stage-${stageConfig.id}`}
+              >
+                <div className={`
+                  flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center
+                  ${isCompleted ? "bg-green-500/20 text-green-500" : ""}
+                  ${isCurrent ? "bg-primary/20 text-primary" : ""}
+                  ${isPending ? "bg-muted text-muted-foreground" : ""}
+                `}>
+                  {isCompleted ? (
+                    <CheckCircle2 className="h-4 w-4" />
+                  ) : isCurrent ? (
+                    <motion.div
+                      animate={{ scale: [1, 1.2, 1] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                    >
+                      <StageIcon className="h-4 w-4" />
+                    </motion.div>
+                  ) : (
+                    <StageIcon className="h-4 w-4" />
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={`text-sm font-medium ${isPending ? "text-muted-foreground" : ""}`}>
+                      {stageConfig.label}
+                    </span>
+                    
+                    {isCurrent && stageConfig.id === "analyzing" && totalBatches > 0 && (
+                      <span className="text-xs font-mono bg-primary/10 text-primary px-2 py-0.5 rounded" data-testid="text-batch-progress">
+                        Batch {currentBatch}/{totalBatches}
+                      </span>
+                    )}
+                    
+                    {isCompleted && (
+                      <span className="text-xs text-green-500">Done</span>
+                    )}
+                  </div>
+
+                  {isCurrent && (
+                    <motion.div 
+                      className="h-1 bg-muted rounded-full mt-1 overflow-hidden"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                    >
+                      <motion.div 
+                        className="h-full bg-primary rounded-full"
+                        animate={{ x: ["-100%", "100%"] }}
+                        transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                        style={{ width: "50%" }}
+                      />
+                    </motion.div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
 
         {statusMessage && (
           <motion.div
             key={statusMessage}
             initial={{ opacity: 0, y: 5 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center space-y-1 p-3 rounded-md bg-muted/50"
+            className="text-center p-3 rounded-md bg-muted/50"
           >
-            <p className="text-sm font-medium">{statusMessage}</p>
+            <p className="text-sm" data-testid="text-status-message">{statusMessage}</p>
           </motion.div>
         )}
 
+        <div className="flex items-center gap-2 p-3 rounded-md bg-blue-500/10 border border-blue-500/20">
+          <Info className="h-4 w-4 text-blue-500 flex-shrink-0" />
+          <p className="text-xs text-blue-600 dark:text-blue-400" data-testid="text-time-estimate">
+            Typical extraction takes about 5 seconds per page.
+            {pagesProcessed > 0 && ` Processing ${pagesProcessed} pages.`}
+          </p>
+        </div>
+
         <div className="flex items-center justify-between border-t pt-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Clock className="h-4 w-4" />
-            <span>Elapsed time: </span>
-            <span className="font-mono font-medium">{formatTime(elapsedTime)}</span>
+          <div className="text-sm text-muted-foreground">
+            <span>Elapsed: </span>
+            <span className="font-mono font-medium" data-testid="text-elapsed-time">{formatTime(elapsedTime)}</span>
           </div>
           
           {onCancel && (
@@ -145,48 +188,13 @@ export function AnimatedProgress({
               variant="outline"
               size="sm"
               onClick={onCancel}
-              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              className="text-destructive hover:text-destructive"
+              data-testid="button-cancel-processing"
             >
               <XCircle className="h-4 w-4 mr-2" />
               Cancel
             </Button>
           )}
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex justify-between text-xs text-muted-foreground">
-            {PROGRESS_STAGES.slice(0, 4).map((stage, index) => {
-              const IconComponent = stage.icon;
-              const isActive = index <= currentStageIndex;
-              const isCurrent = index === currentStageIndex;
-              return (
-                <motion.div
-                  key={index}
-                  className={`flex flex-col items-center gap-1 ${
-                    isActive ? "opacity-100" : "opacity-40"
-                  }`}
-                  animate={isCurrent ? { scale: [1, 1.05, 1] } : {}}
-                  transition={{ duration: 1, repeat: Infinity }}
-                >
-                  <div className={`p-1.5 rounded-full ${
-                    isActive ? "bg-primary/20" : "bg-muted"
-                  }`}>
-                    <IconComponent className={`h-3 w-3 ${
-                      isActive ? stage.color : "text-muted-foreground"
-                    }`} />
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
-          <div className="h-1 bg-muted rounded-full overflow-hidden">
-            <motion.div
-              className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-green-500"
-              initial={{ width: "0%" }}
-              animate={{ width: `${Math.min(100, progress)}%` }}
-              transition={{ duration: 0.5, ease: "easeOut" }}
-            />
-          </div>
         </div>
       </CardContent>
     </Card>
