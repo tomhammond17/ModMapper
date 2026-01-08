@@ -12,8 +12,9 @@ import { createLogger } from "../logger";
 
 const log = createLogger("llm-client");
 
-// Using Claude Opus 4.5 for highest quality PDF parsing
-const DEFAULT_MODEL = "claude-opus-4-20250514";
+// Using Claude Sonnet 4 for good quality with faster response times
+// Opus 4.5 is highest quality but much slower (~60s vs ~15s per batch)
+const DEFAULT_MODEL = "claude-sonnet-4-20250514";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
