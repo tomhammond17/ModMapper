@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Loader2, FileSearch, Brain, FileText, Database, CheckCircle2, Clock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Loader2, FileSearch, Brain, FileText, Database, CheckCircle2, Clock, XCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface ProgressStage {
@@ -24,13 +25,16 @@ interface AnimatedProgressProps {
   statusMessage: string;
   startTime: number;
   fileName?: string;
+  /** Optional callback to cancel the current operation */
+  onCancel?: () => void;
 }
 
 export function AnimatedProgress({ 
   progress, 
   statusMessage, 
   startTime,
-  fileName 
+  fileName,
+  onCancel,
 }: AnimatedProgressProps) {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [currentStageIndex, setCurrentStageIndex] = useState(0);
@@ -129,10 +133,24 @@ export function AnimatedProgress({
           </motion.div>
         )}
 
-        <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground border-t pt-4">
-          <Clock className="h-4 w-4" />
-          <span>Elapsed time: </span>
-          <span className="font-mono font-medium">{formatTime(elapsedTime)}</span>
+        <div className="flex items-center justify-between border-t pt-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Clock className="h-4 w-4" />
+            <span>Elapsed time: </span>
+            <span className="font-mono font-medium">{formatTime(elapsedTime)}</span>
+          </div>
+          
+          {onCancel && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onCancel}
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              <XCircle className="h-4 w-4 mr-2" />
+              Cancel
+            </Button>
+          )}
         </div>
 
         <div className="space-y-2">

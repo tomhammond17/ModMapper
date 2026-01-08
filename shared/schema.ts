@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { pgTable, uuid, text, timestamp, jsonb } from "drizzle-orm/pg-core";
 
 export const modbusDataTypes = [
   "INT16",
@@ -44,6 +45,15 @@ export interface ModbusDocument {
   registers: ModbusRegister[];
   createdAt: Date;
 }
+
+// Drizzle ORM table definition for PostgreSQL persistence
+export const documentsTable = pgTable("documents", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  filename: text("filename").notNull(),
+  sourceFormat: text("source_format").notNull(),
+  registers: jsonb("registers").notNull().$type<ModbusRegister[]>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
 
 export interface ExtractionMetadata {
   totalPages: number;

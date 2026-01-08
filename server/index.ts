@@ -1,7 +1,13 @@
+// IMPORTANT: Import polyfills FIRST before any other imports
+// This ensures DOMMatrix is available before pdfjs-dist loads
+import "./pdf-parser/polyfills";
+
 import express, { type Request, Response, NextFunction } from "express";
+import compression from "compression";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { logger, logRequest } from "./logger";
 
 const app = express();
 const httpServer = createServer(app);
@@ -11,6 +17,24 @@ declare module "http" {
     rawBody: unknown;
   }
 }
+
+// Enable gzip/deflate compression for responses
+// Reduces transfer size for JSON, XML, CSV responses
+app.use(compression({
+  // Compress responses larger than 1KB
+  threshold: 1024,
+  // Compression level (1-9, higher = more compression, slower)
+  level: 6,
+  // Filter function to determine if response should be compressed
+  filter: (req, res) => {
+    // Don't compress SSE streams
+    if (req.path.includes("stream") || req.path.includes("pdf-stream")) {
+      return false;
+    }
+    // Use default filter for everything else
+    return compression.filter(req, res);
+  },
+}));
 
 app.use(
   express.json({
@@ -22,21 +46,11 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
-export function log(message: string, source = "express") {
-  const formattedTime = new Date().toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  });
-
-  console.log(`${formattedTime} [${source}] ${message}`);
-}
-
+// Request logging middleware using structured logger
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+  let capturedJsonResponse: Record<string, unknown> | undefined = undefined;
 
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {
@@ -47,12 +61,7 @@ app.use((req, res, next) => {
   res.on("finish", () => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      log(logLine);
+      logRequest(req.method, path, res.statusCode, duration, capturedJsonResponse);
     }
   });
 
@@ -62,7 +71,7 @@ app.use((req, res, next) => {
 (async () => {
   await registerRoutes(httpServer, app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  app.use((err: Error & { status?: number; statusCode?: number }, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
@@ -85,14 +94,7 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000", 10);
-  httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    },
-    () => {
-      log(`serving on port ${port}`);
-    },
-  );
+  httpServer.listen(port, () => {
+    logger.info(`Server started`, { port, env: process.env.NODE_ENV || "development" });
+  });
 })();

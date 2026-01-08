@@ -1,4 +1,5 @@
-import { useState } from "react";
+import React, { useState, useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Plus, Trash2, Check, X, AlertCircle, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,14 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ModbusRegister, ModbusDataType, ValidationError } from "@shared/schema";
@@ -35,6 +28,13 @@ interface EditingCell {
   field: keyof ModbusRegister;
 }
 
+// Threshold for enabling virtual scrolling
+const VIRTUALIZATION_THRESHOLD = 100;
+// Row height for virtual scrolling calculations
+const ROW_HEIGHT = 52;
+// Container height for virtualized table
+const VIRTUAL_TABLE_HEIGHT = 500;
+
 export function RegisterTable({
   registers,
   onUpdate,
@@ -43,6 +43,17 @@ export function RegisterTable({
 }: RegisterTableProps) {
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
   const [editValue, setEditValue] = useState<string>("");
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  // Only use virtualization for large datasets
+  const useVirtualization = registers.length > VIRTUALIZATION_THRESHOLD;
+
+  const virtualizer = useVirtualizer({
+    count: registers.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 10, // Render 10 extra rows above/below viewport for smoother scrolling
+  });
 
   const getValidationError = (rowIndex: number, field: string): string | undefined => {
     return validationErrors.find((e) => e.row === rowIndex && e.field === field)?.message;
@@ -208,6 +219,116 @@ export function RegisterTable({
     );
   };
 
+  const renderRow = (register: ModbusRegister, index: number, style?: React.CSSProperties) => (
+    <div
+      key={index}
+      className="flex border-b hover:bg-muted/50 transition-colors"
+      style={style}
+      data-testid={`row-register-${index}`}
+    >
+      <div className="w-24 px-4 py-3 flex items-center">
+        {renderCell(index, "address", register.address)}
+      </div>
+      <div className="w-40 px-4 py-3 flex items-center">
+        {renderCell(index, "name", register.name)}
+      </div>
+      <div className="w-28 px-4 py-3 flex items-center">
+        <Badge variant="secondary" className="font-mono text-xs">
+          {register.datatype}
+        </Badge>
+      </div>
+      <div className="flex-1 px-4 py-3 flex items-center max-w-xs">
+        {renderCell(index, "description", register.description)}
+      </div>
+      <div className="w-24 px-4 py-3 flex items-center justify-center">
+        {renderCell(index, "writable", register.writable)}
+      </div>
+      {!isReadOnly && (
+        <div className="w-16 px-4 py-3 flex items-center justify-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => deleteRow(index)}
+            data-testid={`button-delete-${index}`}
+          >
+            <Trash2 className="h-4 w-4 text-muted-foreground" />
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderHeader = () => (
+    <div className="flex bg-muted/50 border-b sticky top-0 z-10">
+      <div className="w-24 px-4 py-3 text-xs font-semibold uppercase text-muted-foreground">
+        Address
+      </div>
+      <div className="w-40 px-4 py-3 text-xs font-semibold uppercase text-muted-foreground">
+        Name
+      </div>
+      <div className="w-28 px-4 py-3 text-xs font-semibold uppercase text-muted-foreground">
+        Data Type
+      </div>
+      <div className="flex-1 px-4 py-3 text-xs font-semibold uppercase text-muted-foreground">
+        Description
+      </div>
+      <div className="w-24 px-4 py-3 text-xs font-semibold uppercase text-muted-foreground text-center">
+        Writable
+      </div>
+      {!isReadOnly && (
+        <div className="w-16 px-4 py-3 text-xs font-semibold uppercase text-muted-foreground text-center">
+          Actions
+        </div>
+      )}
+    </div>
+  );
+
+  const renderVirtualizedTable = () => (
+    <div className="overflow-x-auto">
+      {renderHeader()}
+      <div
+        ref={parentRef}
+        className="overflow-y-auto"
+        style={{ height: VIRTUAL_TABLE_HEIGHT }}
+      >
+        <div
+          style={{
+            height: `${virtualizer.getTotalSize()}px`,
+            width: "100%",
+            position: "relative",
+          }}
+        >
+          {virtualizer.getVirtualItems().map((virtualRow) => {
+            const register = registers[virtualRow.index];
+            return renderRow(register, virtualRow.index, {
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: `${virtualRow.size}px`,
+              transform: `translateY(${virtualRow.start}px)`,
+            });
+          })}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderStandardTable = () => (
+    <div className="overflow-x-auto">
+      {renderHeader()}
+      <div>
+        {registers.length === 0 ? (
+          <div className="h-32 flex items-center justify-center text-muted-foreground">
+            No registers loaded. Upload a file to get started.
+          </div>
+        ) : (
+          registers.map((register, index) => renderRow(register, index))
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-4 pb-4">
@@ -215,6 +336,9 @@ export function RegisterTable({
           <CardTitle className="text-lg">Register Data</CardTitle>
           <p className="text-sm text-muted-foreground mt-1">
             {registers.length} register{registers.length !== 1 ? "s" : ""} loaded
+            {useVirtualization && (
+              <span className="ml-2 text-xs text-primary">(virtual scrolling enabled)</span>
+            )}
           </p>
         </div>
         {!isReadOnly && (
@@ -225,84 +349,7 @@ export function RegisterTable({
         )}
       </CardHeader>
       <CardContent className="p-0">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead className="w-24 text-xs font-semibold uppercase">
-                  Address
-                </TableHead>
-                <TableHead className="w-40 text-xs font-semibold uppercase">
-                  Name
-                </TableHead>
-                <TableHead className="w-28 text-xs font-semibold uppercase">
-                  Data Type
-                </TableHead>
-                <TableHead className="text-xs font-semibold uppercase">
-                  Description
-                </TableHead>
-                <TableHead className="w-24 text-center text-xs font-semibold uppercase">
-                  Writable
-                </TableHead>
-                {!isReadOnly && (
-                  <TableHead className="w-16 text-center text-xs font-semibold uppercase">
-                    Actions
-                  </TableHead>
-                )}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {registers.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={isReadOnly ? 5 : 6}
-                    className="h-32 text-center text-muted-foreground"
-                  >
-                    No registers loaded. Upload a file to get started.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                registers.map((register, index) => (
-                  <TableRow
-                    key={index}
-                    className="hover-elevate"
-                    data-testid={`row-register-${index}`}
-                  >
-                    <TableCell className="py-3">
-                      {renderCell(index, "address", register.address)}
-                    </TableCell>
-                    <TableCell className="py-3">
-                      {renderCell(index, "name", register.name)}
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <Badge variant="secondary" className="font-mono text-xs">
-                        {register.datatype}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="py-3 max-w-xs">
-                      {renderCell(index, "description", register.description)}
-                    </TableCell>
-                    <TableCell className="py-3">
-                      {renderCell(index, "writable", register.writable)}
-                    </TableCell>
-                    {!isReadOnly && (
-                      <TableCell className="py-3 text-center">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => deleteRow(index)}
-                          data-testid={`button-delete-${index}`}
-                        >
-                          <Trash2 className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        {useVirtualization ? renderVirtualizedTable() : renderStandardTable()}
       </CardContent>
     </Card>
   );

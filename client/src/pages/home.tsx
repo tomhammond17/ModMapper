@@ -11,123 +11,39 @@ import { ExtractionFeedback } from "@/components/extraction-feedback";
 import { ExtractionGuide } from "@/components/extraction-guide";
 import { PageIdentifier } from "@/components/page-identifier";
 import { AnimatedProgress } from "@/components/animated-progress";
+import { WorkflowStepper } from "@/components/workflow-stepper";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import type { ModbusRegister, ModbusFileFormat, ModbusSourceFormat, ConversionResult, ExtractionMetadata } from "@shared/schema";
-
-type ConversionStep = "upload" | "pageIdentify" | "converting" | "preview";
-
-interface PdfProgress {
-  stage: "extracting" | "analyzing" | "parsing" | "complete" | "error";
-  progress: number;
-  message: string;
-}
+import { useFileUpload } from "@/hooks/use-file-upload";
+import { usePdfProcessing } from "@/hooks/use-pdf-processing";
+import type { ModbusRegister, ModbusFileFormat, ConversionResult, ExtractionMetadata } from "@shared/schema";
 
 export default function Home() {
   const { toast } = useToast();
-  const [step, setStep] = useState<ConversionStep>("upload");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [sourceFormat, setSourceFormat] = useState<ModbusSourceFormat | null>(null);
+
+  // File upload state
+  const {
+    selectedFile,
+    sourceFormat,
+    filename,
+    handleFileSelect,
+    clearFile,
+  } = useFileUpload();
+
+  // PDF processing state
+  const {
+    state: processingState,
+    parsePdfWithProgress,
+    setStep,
+    reset: resetProcessing,
+    cancel: cancelProcessing,
+  } = usePdfProcessing();
+
+  // Remaining local state
   const [targetFormat, setTargetFormat] = useState<ModbusFileFormat>("json");
   const [registers, setRegisters] = useState<ModbusRegister[]>([]);
-  const [filename, setFilename] = useState<string>("");
-  const [progress, setProgress] = useState(0);
-  const [statusMessage, setStatusMessage] = useState<string>("");
-  const [isPdfProcessing, setIsPdfProcessing] = useState(false);
   const [extractionMetadata, setExtractionMetadata] = useState<ExtractionMetadata | null>(null);
-  const [processingStartTime, setProcessingStartTime] = useState<number>(0);
-
-  const parsePdfWithProgress = useCallback(async (file: File, pageRanges?: string) => {
-    setIsPdfProcessing(true);
-    setStep("converting");
-    setProgress(10);
-    setProcessingStartTime(Date.now());
-    setStatusMessage("Uploading PDF...");
-
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      
-      const endpoint = pageRanges 
-        ? "/api/parse-pdf-with-hints" 
-        : "/api/parse-pdf-stream";
-      
-      if (pageRanges) {
-        formData.append("pageRanges", pageRanges);
-        formData.append("existingRegisters", JSON.stringify([]));
-      }
-
-      const response = await fetch(endpoint, {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to parse PDF");
-      }
-
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error("Failed to read response stream");
-      }
-
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            try {
-              const data = JSON.parse(line.slice(6));
-
-              if (data.type === "progress") {
-                setProgress(data.progress);
-                setStatusMessage(data.message);
-              } else if (data.type === "complete") {
-                const result = data.result as ConversionResult;
-                setRegisters(result.registers);
-                setSourceFormat(result.sourceFormat);
-                setFilename(result.filename);
-                setExtractionMetadata(result.extractionMetadata || null);
-                setProgress(100);
-                setStatusMessage("Conversion complete!");
-                setStep("preview");
-                toast({
-                  title: "Success",
-                  description: `Extracted ${result.registers.length} registers from PDF`,
-                });
-              } else if (data.type === "error") {
-                throw new Error(data.message);
-              }
-            } catch (e) {
-              if (e instanceof SyntaxError) continue;
-              throw e;
-            }
-          }
-        }
-      }
-    } catch (error) {
-      setStep("upload");
-      setProgress(0);
-      setStatusMessage("");
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to parse PDF",
-        variant: "destructive",
-      });
-    } finally {
-      setIsPdfProcessing(false);
-    }
-  }, [toast]);
 
   const parseMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -145,8 +61,6 @@ export default function Home() {
     },
     onSuccess: (data) => {
       setRegisters(data.registers);
-      setSourceFormat(data.sourceFormat);
-      setFilename(data.filename);
       setExtractionMetadata(null);
       if (data.sourceFormat !== targetFormat && data.sourceFormat !== "pdf") {
         setStep("preview");
@@ -155,17 +69,13 @@ export default function Home() {
         setTargetFormat(nextFormat);
         setStep("preview");
       }
-      setProgress(100);
-      setStatusMessage("Conversion complete!");
       toast({
         title: "Success",
         description: `Loaded ${data.registers.length} registers from ${data.filename}`,
       });
     },
     onError: (error: Error) => {
-      setStep("upload");
-      setProgress(0);
-      setStatusMessage("");
+      resetProcessing();
       toast({
         title: "Error",
         description: error.message,
@@ -174,178 +84,94 @@ export default function Home() {
     },
   });
 
-  const handleFileSelect = useCallback((file: File) => {
-    setSelectedFile(file);
-    setFilename(file.name);
+  const handlePdfExtract = useCallback(
+    async (pageRanges?: string, existingRegs?: ModbusRegister[]) => {
+      if (!selectedFile) return;
 
-    const ext = file.name.split(".").pop()?.toLowerCase();
-    if (ext === "csv") setSourceFormat("csv");
-    else if (ext === "json") setSourceFormat("json");
-    else if (ext === "xml") setSourceFormat("xml");
-    else if (ext === "pdf") setSourceFormat("pdf");
-    else setSourceFormat(null);
-  }, []);
+      try {
+        const result = await parsePdfWithProgress(selectedFile, pageRanges, existingRegs);
 
-  const handleClearFile = useCallback(() => {
-    setSelectedFile(null);
-    setSourceFormat(null);
-    setRegisters([]);
-    setFilename("");
-    setStep("upload");
-    setProgress(0);
-    setStatusMessage("");
-    setIsPdfProcessing(false);
-    setExtractionMetadata(null);
-  }, []);
-
-  const handleReExtractWithHints = useCallback(async (pageRanges: string) => {
-    if (!selectedFile) return;
-    
-    setIsPdfProcessing(true);
-    setStep("converting");
-    setProgress(10);
-    setProcessingStartTime(Date.now());
-    setStatusMessage("Re-extracting from specified pages...");
-
-    try {
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-      formData.append("pageRanges", pageRanges);
-      formData.append("existingRegisters", JSON.stringify(registers));
-
-      const response = await fetch("/api/parse-pdf-with-hints", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to re-extract from PDF");
-      }
-
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error("Failed to read response stream");
-      }
-
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            try {
-              const data = JSON.parse(line.slice(6));
-
-              if (data.type === "progress") {
-                setProgress(data.progress);
-                setStatusMessage(data.message);
-              } else if (data.type === "complete") {
-                const result = data.result as ConversionResult;
-                const previousCount = registers.length;
-                const newCount = result.registers.length - previousCount;
-                setRegisters(result.registers);
-                setExtractionMetadata(result.extractionMetadata || null);
-                setProgress(100);
-                setStatusMessage("Re-extraction complete!");
-                setStep("preview");
-                toast({
-                  title: "Success",
-                  description: newCount > 0 
-                    ? `Found ${newCount} additional registers (${result.registers.length} total)`
-                    : newCount === 0
-                    ? `No new unique registers found. Total: ${result.registers.length}`
-                    : `Re-extracted ${result.registers.length} registers`,
-                });
-              } else if (data.type === "error") {
-                throw new Error(data.message);
-              }
-            } catch (e) {
-              if (e instanceof SyntaxError) continue;
-              throw e;
-            }
+        if (result) {
+          if (result.registers.length === 0) {
+            toast({
+              title: "No Registers Found",
+              description: "No Modbus registers found in the PDF",
+              variant: "destructive",
+            });
+            return;
           }
+
+          const previousCount = existingRegs?.length || 0;
+          const newCount = result.registers.length - previousCount;
+
+          setRegisters(result.registers);
+          setExtractionMetadata(result.extractionMetadata || null);
+
+          toast({
+            title: "Success",
+            description: existingRegs
+              ? newCount > 0
+                ? `Found ${newCount} additional registers (${result.registers.length} total)`
+                : `No new unique registers found. Total: ${result.registers.length}`
+              : `Extracted ${result.registers.length} registers from PDF`,
+          });
         }
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: error instanceof Error ? error.message : "Failed to parse PDF",
+          variant: "destructive",
+        });
       }
-    } catch (error) {
-      setStep("preview");
-      setProgress(0);
-      setStatusMessage("");
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to re-extract from PDF",
-        variant: "destructive",
-      });
-    } finally {
-      setIsPdfProcessing(false);
-    }
-  }, [selectedFile, registers, toast]);
+    },
+    [selectedFile, parsePdfWithProgress, toast]
+  );
 
   const handleConvert = useCallback(() => {
     if (!selectedFile) return;
 
     const ext = selectedFile.name.split(".").pop()?.toLowerCase();
 
-    // For PDFs, show page identifier step first
     if (ext === "pdf") {
       setStep("pageIdentify");
       return;
     }
 
-    // Regular parsing for other file types
     setStep("converting");
-    setProgress(10);
-    setProcessingStartTime(Date.now());
-    setStatusMessage("Reading file...");
-
-    const progressInterval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 90) {
-          clearInterval(progressInterval);
-          return prev;
-        }
-        return prev + 10;
-      });
-    }, 200);
-
-    setTimeout(() => {
-      setStatusMessage("Parsing registers...");
-    }, 400);
-
-    setTimeout(() => {
-      setStatusMessage("Validating data...");
-    }, 800);
-
     parseMutation.mutate(selectedFile);
-  }, [selectedFile, parseMutation]);
+  }, [selectedFile, parseMutation, setStep]);
 
-  const handleExtractPages = useCallback((pageRanges: string) => {
-    if (!selectedFile) return;
-    parsePdfWithProgress(selectedFile, pageRanges);
-  }, [selectedFile, parsePdfWithProgress]);
+  const handleExtractPages = useCallback(
+    (pageRanges: string) => {
+      handlePdfExtract(pageRanges);
+    },
+    [handlePdfExtract]
+  );
 
   const handleExtractFullDocument = useCallback(() => {
-    if (!selectedFile) return;
-    parsePdfWithProgress(selectedFile);
-  }, [selectedFile, parsePdfWithProgress]);
+    handlePdfExtract();
+  }, [handlePdfExtract]);
+
+  const handleReExtractWithHints = useCallback(
+    (pageRanges: string) => {
+      handlePdfExtract(pageRanges, registers);
+    },
+    [handlePdfExtract, registers]
+  );
 
   const handleCancelPageIdentifier = useCallback(() => {
     setStep("upload");
-  }, []);
+  }, [setStep]);
 
   const handleClearAll = useCallback(() => {
-    handleClearFile();
-  }, [handleClearFile]);
+    clearFile();
+    resetProcessing();
+    setRegisters([]);
+    setExtractionMetadata(null);
+  }, [clearFile, resetProcessing]);
 
-  const canConvert = !!selectedFile && !parseMutation.isPending && !isPdfProcessing;
-  const isProcessing = parseMutation.isPending || step === "converting" || isPdfProcessing;
+  const canConvert = !!selectedFile && !parseMutation.isPending && !processingState.isProcessing;
+  const isProcessing = parseMutation.isPending || processingState.step === "converting" || processingState.isProcessing;
 
   return (
     <div className="min-h-screen bg-background">
@@ -371,12 +197,17 @@ export default function Home() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        {/* Workflow Stepper */}
+        <section className="max-w-2xl mx-auto">
+          <WorkflowStepper currentStep={processingState.step} />
+        </section>
+
         <section className="text-center space-y-4">
           <h2 className="text-2xl sm:text-3xl font-semibold text-foreground">
             Convert Modbus Configuration Files
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Upload your Modbus register configurations in CSV, XML, JSON, or PDF format. 
+            Upload your Modbus register configurations in CSV, XML, JSON, or PDF format.
             Preview, edit, and download in your preferred format.
           </p>
         </section>
@@ -386,10 +217,10 @@ export default function Home() {
             onFileSelect={handleFileSelect}
             isProcessing={isProcessing}
             selectedFile={selectedFile}
-            onClear={handleClearFile}
+            onClear={handleClearAll}
           />
 
-          {selectedFile && step === "upload" && (
+          {selectedFile && processingState.step === "upload" && (
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 p-6 bg-card rounded-md border">
               <div className="flex items-center gap-4 flex-wrap">
                 {sourceFormat && (
@@ -412,14 +243,14 @@ export default function Home() {
                 onClear={handleClearAll}
                 isProcessing={isProcessing}
                 canConvert={canConvert}
-                progress={progress}
-                statusMessage={statusMessage}
+                progress={processingState.progress}
+                statusMessage={processingState.statusMessage}
                 statusType={isProcessing ? "processing" : "success"}
               />
             </div>
           )}
 
-          {step === "pageIdentify" && selectedFile && (
+          {processingState.step === "pageIdentify" && selectedFile && (
             <PageIdentifier
               fileName={selectedFile.name}
               onExtractPages={handleExtractPages}
@@ -428,17 +259,18 @@ export default function Home() {
             />
           )}
 
-          {step === "converting" && (
+          {processingState.step === "converting" && (
             <AnimatedProgress
-              progress={progress}
-              statusMessage={statusMessage}
-              startTime={processingStartTime}
+              progress={processingState.progress}
+              statusMessage={processingState.statusMessage}
+              startTime={processingState.startTime}
               fileName={selectedFile?.name}
+              onCancel={cancelProcessing}
             />
           )}
         </section>
 
-        {step === "preview" && registers.length > 0 && (
+        {processingState.step === "preview" && registers.length > 0 && (
           <section className="space-y-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-success/10 rounded-md border border-success/20">
               <div className="flex items-center gap-3">
@@ -487,7 +319,7 @@ export default function Home() {
                 registers={registers}
                 selectedFile={selectedFile}
                 onReExtract={handleReExtractWithHints}
-                isProcessing={isPdfProcessing}
+                isProcessing={processingState.isProcessing}
               />
             )}
 
