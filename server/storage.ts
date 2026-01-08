@@ -116,7 +116,6 @@ export class PostgresStorage implements IStorage {
   }
 }
 
-// Use PostgreSQL storage if DATABASE_URL is set, otherwise fall back to in-memory
-export const storage: IStorage = isDatabaseAvailable()
-  ? new PostgresStorage()
-  : new MemStorage();
+// Use in-memory storage for this converter app (documents don't need to persist)
+// PostgresStorage is available if persistence is needed in the future
+export const storage: IStorage = new MemStorage();
