@@ -4,7 +4,7 @@ import "./pdf-parser/polyfills";
 
 import express, { type Request, Response, NextFunction } from "express";
 import compression from "compression";
-import { registerRoutes } from "./routes";
+import { registerSSERoutes, registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { logger, logRequest } from "./logger";
@@ -23,40 +23,7 @@ declare module "http" {
   }
 }
 
-// Enable gzip/deflate compression for responses
-// Reduces transfer size for JSON, XML, CSV responses
-app.use(compression({
-  // Compress responses larger than 1KB
-  threshold: 1024,
-  // Compression level (1-9, higher = more compression, slower)
-  level: 6,
-  // Filter function to determine if response should be compressed
-  filter: (req, res) => {
-    // Don't compress SSE streams - these need real-time delivery
-    const contentType = res.getHeader("Content-Type");
-    if (contentType && String(contentType).includes("text/event-stream")) {
-      return false;
-    }
-    // Also check paths for SSE endpoints
-    if (req.path.includes("stream") || req.path.includes("pdf-stream") || req.path.includes("pdf-with-hints")) {
-      return false;
-    }
-    // Use default filter for everything else
-    return compression.filter(req, res);
-  },
-}));
-
-app.use(
-  express.json({
-    verify: (req, _res, buf) => {
-      req.rawBody = buf;
-    },
-  }),
-);
-
-app.use(express.urlencoded({ extended: false }));
-
-// Request logging middleware using structured logger
+// Request logging middleware using structured logger (before everything for accurate timing)
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -78,7 +45,30 @@ app.use((req, res, next) => {
   next();
 });
 
+// Parse JSON and urlencoded bodies for all routes
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  }),
+);
+
+app.use(express.urlencoded({ extended: false }));
+
 (async () => {
+  // IMPORTANT: Register SSE routes BEFORE compression middleware
+  // This ensures SSE responses are never wrapped by compression
+  await registerSSERoutes(httpServer, app);
+
+  // Enable gzip/deflate compression for non-SSE responses
+  // Reduces transfer size for JSON, XML, CSV responses
+  app.use(compression({
+    threshold: 1024,
+    level: 6,
+  }));
+
+  // Register remaining routes (after compression so they get compressed)
   await registerRoutes(httpServer, app);
 
   app.use((err: Error & { status?: number; statusCode?: number }, _req: Request, res: Response, _next: NextFunction) => {

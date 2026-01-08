@@ -71,6 +71,223 @@ function handleMulterError(err: Error, req: Request, res: Response, next: NextFu
   next();
 }
 
+/**
+ * Register SSE routes BEFORE compression middleware.
+ * These routes need unbuffered response streaming for real-time progress updates.
+ */
+export async function registerSSERoutes(
+  httpServer: Server,
+  app: Express
+): Promise<Server> {
+  // Stream PDF parsing with progress updates (Server-Sent Events)
+  // Rate limited: 10 requests per 15 minutes (expensive Claude API calls)
+  // Uses validation middleware: validatePdfFile
+  // Supports cancellation via client disconnect
+  app.post("/api/parse-pdf-stream", pdfParseLimiter, upload.single("file"), handleMulterError, validatePdfFile, async (req: Request, res: Response) => {
+    // File validated by middleware
+    const filename = req.file!.originalname;
+
+    // Create abort controller for cancellation support
+    const abortController = new AbortController();
+
+    // Check cache before starting SSE
+    const cacheKey = pdfCache.getHash(req.file!.buffer);
+    const cached = pdfCache.get(cacheKey);
+
+    // Set up SSE with timeout (5 minutes default)
+    // Use res.on("close") via SSE utility to detect client disconnect (not req.on("close"))
+    const sse = createSSEConnection(res, {
+      timeoutMs: SSE_CONFIG.DEFAULT_TIMEOUT_MS,
+      onTimeout: () => {
+        log.warn("SSE timeout during PDF parsing", { filename });
+        abortController.abort();
+      },
+      onClose: () => {
+        log.info("Client disconnected, aborting PDF processing", { filename });
+        abortController.abort();
+      },
+    });
+
+    // If cached, return immediately
+    if (cached && cached.registers.length > 0) {
+      sse.sendProgress(100, "Retrieved from cache");
+
+      await storage.createDocument({
+        filename,
+        sourceFormat: "pdf" as ModbusSourceFormat,
+        registers: cached.registers,
+      });
+
+      const result: ConversionResult = {
+        success: true,
+        message: `Retrieved ${cached.registers.length} registers from cache`,
+        registers: cached.registers,
+        sourceFormat: "pdf" as ModbusSourceFormat,
+        filename,
+        extractionMetadata: cached.metadata,
+      };
+
+      sse.sendComplete(result);
+      return;
+    }
+
+    const sendProgress = (progress: PdfParseProgress) => {
+      if (sse.isActive()) {
+        sse.sendProgress(progress.progress, progress.message, progress.details, {
+          stage: progress.stage,
+          totalBatches: progress.totalBatches,
+          currentBatch: progress.currentBatch,
+          totalPages: progress.totalPages,
+          pagesProcessed: progress.pagesProcessed,
+        });
+      }
+    };
+
+    try {
+      const parseResult = await parsePdfFile(req.file!.buffer, sendProgress, abortController.signal);
+      const { registers, metadata } = parseResult;
+
+      if (!sse.isActive()) {
+        // Client disconnected or timed out during processing
+        return;
+      }
+
+      if (registers.length === 0) {
+        sse.sendError("No Modbus registers found in the PDF");
+        return;
+      }
+
+      // Cache successful results
+      pdfCache.set(cacheKey, parseResult);
+
+      await storage.createDocument({
+        filename,
+        sourceFormat: "pdf" as ModbusSourceFormat,
+        registers,
+      });
+
+      const result: ConversionResult = {
+        success: true,
+        message: `Successfully extracted ${registers.length} registers from PDF`,
+        registers,
+        sourceFormat: "pdf" as ModbusSourceFormat,
+        filename,
+        extractionMetadata: metadata,
+      };
+
+      sse.sendComplete(result);
+    } catch (error) {
+      if (isAbortError(error)) {
+        log.info("PDF processing cancelled", { filename });
+        sse.sendError("Processing cancelled");
+      } else {
+        const message = error instanceof Error ? error.message : "Failed to parse PDF";
+        sse.sendError(message);
+      }
+    }
+  });
+
+  // Re-extract with page hints - targeted extraction on specific pages (SSE)
+  // Rate limited: 10 requests per 15 minutes (expensive Claude API calls)
+  // Uses validation middleware: validatePdfFile, validatePageRanges
+  // Supports cancellation via client disconnect
+  app.post("/api/parse-pdf-with-hints", pdfParseLimiter, upload.single("file"), handleMulterError, validatePdfFile, validatePageRanges, async (req: Request, res: Response) => {
+    // File and page ranges validated by middleware
+    const filename = req.file!.originalname;
+    const pageHints = parsePageRanges(req.body.pageRanges);
+
+    // Create abort controller for cancellation support
+    const abortController = new AbortController();
+
+    // Parse existing registers from request body
+    let existingRegisters: ModbusRegister[] = [];
+    try {
+      if (req.body.existingRegisters) {
+        existingRegisters = JSON.parse(req.body.existingRegisters);
+      }
+    } catch {
+      // Ignore parse errors, start fresh
+    }
+
+    // Set up SSE with timeout (5 minutes default)
+    // Use res.on("close") via SSE utility to detect client disconnect (not req.on("close"))
+    const sse = createSSEConnection(res, {
+      timeoutMs: SSE_CONFIG.DEFAULT_TIMEOUT_MS,
+      onTimeout: () => {
+        log.warn("SSE timeout during PDF parsing with hints", { filename });
+        abortController.abort();
+      },
+      onClose: () => {
+        log.info("Client disconnected, aborting PDF processing with hints", { filename });
+        abortController.abort();
+      },
+    });
+
+    const sendProgress = (progress: PdfParseProgress) => {
+      if (sse.isActive()) {
+        sse.sendProgress(progress.progress, progress.message, progress.details, {
+          stage: progress.stage,
+          totalBatches: progress.totalBatches,
+          currentBatch: progress.currentBatch,
+          totalPages: progress.totalPages,
+          pagesProcessed: progress.pagesProcessed,
+        });
+      }
+    };
+
+    try {
+      const { registers, metadata } = await parsePdfWithPageHints(
+        req.file!.buffer, 
+        pageHints, 
+        existingRegisters,
+        sendProgress,
+        abortController.signal
+      );
+
+      if (!sse.isActive()) {
+        // Client disconnected or timed out during processing
+        return;
+      }
+
+      if (registers.length === 0) {
+        sse.sendError("No Modbus registers found in the specified pages");
+        return;
+      }
+
+      await storage.createDocument({
+        filename,
+        sourceFormat: "pdf" as ModbusSourceFormat,
+        registers,
+      });
+
+      const result: ConversionResult = {
+        success: true,
+        message: `Successfully extracted ${registers.length} registers from specified pages`,
+        registers,
+        sourceFormat: "pdf" as ModbusSourceFormat,
+        filename,
+        extractionMetadata: metadata,
+      };
+
+      sse.sendComplete(result);
+    } catch (error) {
+      if (isAbortError(error)) {
+        log.info("PDF processing with hints cancelled", { filename });
+        sse.sendError("Processing cancelled");
+      } else {
+        const message = error instanceof Error ? error.message : "Failed to parse PDF";
+        sse.sendError(message);
+      }
+    }
+  });
+
+  return httpServer;
+}
+
+/**
+ * Register remaining routes AFTER compression middleware.
+ * These routes benefit from response compression.
+ */
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -227,208 +444,6 @@ export async function registerRoutes(
         success: false,
         message,
       });
-    }
-  });
-
-  // Stream PDF parsing with progress updates (Server-Sent Events)
-  // Rate limited: 10 requests per 15 minutes (expensive Claude API calls)
-  // Uses validation middleware: validatePdfFile
-  // Supports cancellation via client disconnect
-  app.post("/api/parse-pdf-stream", pdfParseLimiter, upload.single("file"), handleMulterError, validatePdfFile, async (req: Request, res: Response) => {
-    // File validated by middleware
-    const filename = req.file!.originalname;
-
-    // Create abort controller for cancellation support
-    const abortController = new AbortController();
-
-    // Check cache before starting SSE
-    const cacheKey = pdfCache.getHash(req.file!.buffer);
-    const cached = pdfCache.get(cacheKey);
-
-    // Set up SSE with timeout (5 minutes default)
-    // Use res.on("close") via SSE utility to detect client disconnect (not req.on("close"))
-    const sse = createSSEConnection(res, {
-      timeoutMs: SSE_CONFIG.DEFAULT_TIMEOUT_MS,
-      onTimeout: () => {
-        log.warn("SSE timeout during PDF parsing", { filename });
-        abortController.abort();
-      },
-      onClose: () => {
-        log.info("Client disconnected, aborting PDF processing", { filename });
-        abortController.abort();
-      },
-    });
-
-    // If cached, return immediately
-    if (cached && cached.registers.length > 0) {
-      sse.sendProgress(100, "Retrieved from cache");
-
-      await storage.createDocument({
-        filename,
-        sourceFormat: "pdf" as ModbusSourceFormat,
-        registers: cached.registers,
-      });
-
-      const result: ConversionResult = {
-        success: true,
-        message: `Retrieved ${cached.registers.length} registers from cache`,
-        registers: cached.registers,
-        sourceFormat: "pdf" as ModbusSourceFormat,
-        filename,
-        extractionMetadata: cached.metadata,
-      };
-
-      sse.sendComplete(result);
-      return;
-    }
-
-    const sendProgress = (progress: PdfParseProgress) => {
-      if (sse.isActive()) {
-        sse.sendProgress(progress.progress, progress.message, progress.details, {
-          stage: progress.stage,
-          totalBatches: progress.totalBatches,
-          currentBatch: progress.currentBatch,
-          totalPages: progress.totalPages,
-          pagesProcessed: progress.pagesProcessed,
-        });
-      }
-    };
-
-    try {
-      const parseResult = await parsePdfFile(req.file!.buffer, sendProgress, abortController.signal);
-      const { registers, metadata } = parseResult;
-
-      if (!sse.isActive()) {
-        // Client disconnected or timed out during processing
-        return;
-      }
-
-      if (registers.length === 0) {
-        sse.sendError("No Modbus registers found in the PDF");
-        return;
-      }
-
-      // Cache successful results
-      pdfCache.set(cacheKey, parseResult);
-
-      await storage.createDocument({
-        filename,
-        sourceFormat: "pdf" as ModbusSourceFormat,
-        registers,
-      });
-
-      const result: ConversionResult = {
-        success: true,
-        message: `Successfully extracted ${registers.length} registers from PDF`,
-        registers,
-        sourceFormat: "pdf" as ModbusSourceFormat,
-        filename,
-        extractionMetadata: metadata,
-      };
-
-      sse.sendComplete(result);
-    } catch (error) {
-      if (isAbortError(error)) {
-        log.info("PDF processing cancelled", { filename });
-        sse.sendError("Processing cancelled");
-      } else {
-      const message = error instanceof Error ? error.message : "Failed to parse PDF";
-      sse.sendError(message);
-      }
-    }
-  });
-
-  // Re-extract with page hints - targeted extraction on specific pages
-  // Rate limited: 10 requests per 15 minutes (expensive Claude API calls)
-  // Uses validation middleware: validatePdfFile, validatePageRanges
-  // Supports cancellation via client disconnect
-  app.post("/api/parse-pdf-with-hints", pdfParseLimiter, upload.single("file"), handleMulterError, validatePdfFile, validatePageRanges, async (req: Request, res: Response) => {
-    // File and page ranges validated by middleware
-    const filename = req.file!.originalname;
-    const pageHints = parsePageRanges(req.body.pageRanges);
-
-    // Create abort controller for cancellation support
-    const abortController = new AbortController();
-
-    // Parse existing registers from request body
-    let existingRegisters: ModbusRegister[] = [];
-    try {
-      if (req.body.existingRegisters) {
-        existingRegisters = JSON.parse(req.body.existingRegisters);
-      }
-    } catch {
-      // Ignore parse errors, start fresh
-    }
-
-    // Set up SSE with timeout (5 minutes default)
-    // Use res.on("close") via SSE utility to detect client disconnect (not req.on("close"))
-    const sse = createSSEConnection(res, {
-      timeoutMs: SSE_CONFIG.DEFAULT_TIMEOUT_MS,
-      onTimeout: () => {
-        log.warn("SSE timeout during PDF parsing with hints", { filename });
-        abortController.abort();
-      },
-      onClose: () => {
-        log.info("Client disconnected, aborting PDF processing with hints", { filename });
-        abortController.abort();
-      },
-    });
-
-    const sendProgress = (progress: PdfParseProgress) => {
-      if (sse.isActive()) {
-        sse.sendProgress(progress.progress, progress.message, progress.details, {
-          stage: progress.stage,
-          totalBatches: progress.totalBatches,
-          currentBatch: progress.currentBatch,
-          totalPages: progress.totalPages,
-          pagesProcessed: progress.pagesProcessed,
-        });
-      }
-    };
-
-    try {
-      const { registers, metadata } = await parsePdfWithPageHints(
-        req.file!.buffer, 
-        pageHints, 
-        existingRegisters,
-        sendProgress,
-        abortController.signal
-      );
-
-      if (!sse.isActive()) {
-        // Client disconnected or timed out during processing
-        return;
-      }
-
-      if (registers.length === 0) {
-        sse.sendError("No Modbus registers found in the specified pages");
-        return;
-      }
-
-      await storage.createDocument({
-        filename,
-        sourceFormat: "pdf" as ModbusSourceFormat,
-        registers,
-      });
-
-      const result: ConversionResult = {
-        success: true,
-        message: `Successfully extracted ${registers.length} registers from specified pages`,
-        registers,
-        sourceFormat: "pdf" as ModbusSourceFormat,
-        filename,
-        extractionMetadata: metadata,
-      };
-
-      sse.sendComplete(result);
-    } catch (error) {
-      if (isAbortError(error)) {
-        log.info("PDF processing with hints cancelled", { filename });
-        sse.sendError("Processing cancelled");
-      } else {
-      const message = error instanceof Error ? error.message : "Failed to parse PDF";
-      sse.sendError(message);
-      }
     }
   });
 

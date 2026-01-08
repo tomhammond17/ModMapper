@@ -47,10 +47,16 @@ export function createSSEConnection(
 
   // Set up SSE headers
   res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("Connection", "keep-alive");
   res.setHeader("X-Accel-Buffering", "no"); // Disable nginx buffering
+  res.setHeader("Content-Encoding", "identity"); // Prevent any encoding that might buffer
   res.flushHeaders();
+
+  // Disable TCP Nagle algorithm for real-time delivery
+  if (res.socket) {
+    res.socket.setNoDelay(true);
+  }
 
   // Cleanup function
   const cleanup = () => {
@@ -104,10 +110,6 @@ export function createSSEConnection(
       if (isConnectionActive) {
         try {
           res.write(`data: ${JSON.stringify({ type: event, ...data })}\n\n`);
-          // Explicitly flush to ensure real-time delivery
-          if (typeof (res as NodeJS.WritableStream & { flush?: () => void }).flush === "function") {
-            (res as NodeJS.WritableStream & { flush: () => void }).flush();
-          }
         } catch {
           cleanup();
         }
@@ -124,10 +126,6 @@ export function createSSEConnection(
             details,
             ...extra
           })}\n\n`);
-          // Explicitly flush to ensure real-time delivery
-          if (typeof (res as NodeJS.WritableStream & { flush?: () => void }).flush === "function") {
-            (res as NodeJS.WritableStream & { flush: () => void }).flush();
-          }
         } catch {
           cleanup();
         }
