@@ -35,32 +35,50 @@ export async function parseSSEStream<T>(
   const decoder = new TextDecoder();
   let buffer = "";
 
+  // Helper function to process SSE lines
+  const processLine = (line: string) => {
+    if (line.startsWith("data: ")) {
+      try {
+        const data = JSON.parse(line.slice(6)) as SSEEvent<T>;
+
+        if (data.type === "progress") {
+          callbacks.onProgress(data.progress, data.message);
+        } else if (data.type === "complete") {
+          callbacks.onComplete(data.result);
+        } else if (data.type === "error") {
+          callbacks.onError(new Error(data.message));
+        }
+      } catch (e) {
+        if (!(e instanceof SyntaxError)) {
+          throw e;
+        }
+      }
+    }
+  };
+
   try {
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      
+      // Decode chunk - flush decoder on stream end
+      buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+      
+      if (done) {
+        // Process any remaining content in buffer before exiting
+        if (buffer.trim()) {
+          const lines = buffer.split("\n\n");
+          for (const line of lines) {
+            processLine(line);
+          }
+        }
+        break;
+      }
 
-      buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n\n");
       buffer = lines.pop() || "";
 
       for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          try {
-            const data = JSON.parse(line.slice(6)) as SSEEvent<T>;
-
-            if (data.type === "progress") {
-              callbacks.onProgress(data.progress, data.message);
-            } else if (data.type === "complete") {
-              callbacks.onComplete(data.result);
-            } else if (data.type === "error") {
-              callbacks.onError(new Error(data.message));
-            }
-          } catch (e) {
-            if (e instanceof SyntaxError) continue;
-            throw e;
-          }
-        }
+        processLine(line);
       }
     }
   } finally {

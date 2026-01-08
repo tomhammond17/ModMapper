@@ -7,7 +7,7 @@ const DEFAULT_SSE_TIMEOUT_MS = 5 * 60 * 1000;
 const HEARTBEAT_INTERVAL_MS = 30 * 1000;
 
 export interface SSEConnection {
-  send: (event: string, data: unknown) => void;
+  send: (event: string, data: Record<string, unknown>) => void;
   sendProgress: (progress: number, message: string, details?: string) => void;
   sendComplete: (result: unknown) => void;
   sendError: (message: string) => void;
@@ -92,7 +92,7 @@ export function createSSEConnection(
   }, timeoutMs);
 
   return {
-    send: (event: string, data: unknown) => {
+    send: (event: string, data: Record<string, unknown>) => {
       if (isConnectionActive) {
         try {
           res.write(`data: ${JSON.stringify({ type: event, ...data })}\n\n`);
