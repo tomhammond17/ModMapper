@@ -1,6 +1,6 @@
-import React, { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Plus, Trash2, Check, X, AlertCircle, Pencil } from "lucide-react";
+import { Plus, Trash2, Check, X, AlertCircle, Pencil, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -43,13 +43,38 @@ export function RegisterTable({
 }: RegisterTableProps) {
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
   const [editValue, setEditValue] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const parentRef = useRef<HTMLDivElement>(null);
 
+  const filteredData = useMemo(() => {
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) {
+      return registers.map((reg, idx) => ({ register: reg, originalIndex: idx }));
+    }
+    return registers
+      .map((reg, idx) => ({ register: reg, originalIndex: idx }))
+      .filter(({ register }) => {
+        const addressMatch = String(register.address).includes(query);
+        const nameMatch = register.name.toLowerCase().includes(query);
+        const descriptionMatch = register.description.toLowerCase().includes(query);
+        return addressMatch || nameMatch || descriptionMatch;
+      });
+  }, [registers, searchQuery]);
+
+  const filteredRegisters = useMemo(
+    () => filteredData.map((d) => d.register),
+    [filteredData]
+  );
+
+  const getOriginalIndex = (filteredIndex: number): number => {
+    return filteredData[filteredIndex]?.originalIndex ?? filteredIndex;
+  };
+
   // Only use virtualization for large datasets
-  const useVirtualization = registers.length > VIRTUALIZATION_THRESHOLD;
+  const useVirtualization = filteredRegisters.length > VIRTUALIZATION_THRESHOLD;
 
   const virtualizer = useVirtualizer({
-    count: registers.length,
+    count: filteredRegisters.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => ROW_HEIGHT,
     overscan: 10, // Render 10 extra rows above/below viewport for smoother scrolling
@@ -299,8 +324,9 @@ export function RegisterTable({
           }}
         >
           {virtualizer.getVirtualItems().map((virtualRow) => {
-            const register = registers[virtualRow.index];
-            return renderRow(register, virtualRow.index, {
+            const register = filteredRegisters[virtualRow.index];
+            const originalIndex = getOriginalIndex(virtualRow.index);
+            return renderRow(register, originalIndex, {
               position: "absolute",
               top: 0,
               left: 0,
@@ -318,12 +344,17 @@ export function RegisterTable({
     <div className="overflow-x-auto">
       {renderHeader()}
       <div>
-        {registers.length === 0 ? (
+        {filteredRegisters.length === 0 ? (
           <div className="h-32 flex items-center justify-center text-muted-foreground">
-            No registers loaded. Upload a file to get started.
+            {registers.length === 0
+              ? "No registers loaded. Upload a file to get started."
+              : "No registers match your search."}
           </div>
         ) : (
-          registers.map((register, index) => renderRow(register, index))
+          filteredRegisters.map((register, filteredIndex) => {
+            const originalIndex = getOriginalIndex(filteredIndex);
+            return renderRow(register, originalIndex);
+          })
         )}
       </div>
     </div>
@@ -331,21 +362,37 @@ export function RegisterTable({
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-4 pb-4">
-        <div>
-          <CardTitle className="text-lg">Register Data</CardTitle>
-          <p className="text-sm text-muted-foreground mt-1">
-            {registers.length} register{registers.length !== 1 ? "s" : ""} loaded
-            {useVirtualization && (
-              <span className="ml-2 text-xs text-primary">(virtual scrolling enabled)</span>
-            )}
-          </p>
+      <CardHeader className="flex flex-col gap-4 pb-4">
+        <div className="flex flex-row items-center justify-between gap-4">
+          <div>
+            <CardTitle className="text-lg">Register Data</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              {searchQuery
+                ? `Showing ${filteredRegisters.length} of ${registers.length} registers`
+                : `${registers.length} register${registers.length !== 1 ? "s" : ""} loaded`}
+              {useVirtualization && (
+                <span className="ml-2 text-xs text-primary">(virtual scrolling enabled)</span>
+              )}
+            </p>
+          </div>
+          {!isReadOnly && (
+            <Button variant="outline" size="sm" onClick={addRow} data-testid="button-add-row">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Row
+            </Button>
+          )}
         </div>
-        {!isReadOnly && (
-          <Button variant="outline" size="sm" onClick={addRow} data-testid="button-add-row">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Row
-          </Button>
+        {registers.length > 0 && (
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by address, name, or description..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+              data-testid="input-register-search"
+            />
+          </div>
         )}
       </CardHeader>
       <CardContent className="p-0">
