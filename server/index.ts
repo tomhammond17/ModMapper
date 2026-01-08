@@ -10,6 +10,11 @@ import { createServer } from "http";
 import { logger, logRequest } from "./logger";
 
 const app = express();
+
+// Trust first proxy (required for Replit and other proxy environments)
+// This ensures express-rate-limit correctly identifies clients via X-Forwarded-For header
+app.set("trust proxy", 1);
+
 const httpServer = createServer(app);
 
 declare module "http" {
