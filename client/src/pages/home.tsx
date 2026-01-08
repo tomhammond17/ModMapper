@@ -253,6 +253,7 @@ export default function Home() {
           {processingState.step === "pageIdentify" && selectedFile && (
             <PageIdentifier
               fileName={selectedFile.name}
+              file={selectedFile}
               onExtractPages={handleExtractPages}
               onExtractFullDocument={handleExtractFullDocument}
               onCancel={handleCancelPageIdentifier}
