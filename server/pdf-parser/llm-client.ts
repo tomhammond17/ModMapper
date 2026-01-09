@@ -9,6 +9,7 @@ import type { ModbusRegister } from "@shared/schema";
 import { normalizeDataType } from "../utils/datatype";
 import { repairJson, extractRegistersFromMalformedJson } from "./json-repair";
 import { createLogger } from "../logger";
+import { withRetry } from "../utils/retry";
 
 const log = createLogger("llm-client");
 
@@ -67,9 +68,12 @@ If no registers found, output exactly: []`;
 
 /**
  * Parse Modbus registers from assembled context using Claude API.
+ * @param context - The extracted PDF text content
+ * @param signal - Optional AbortSignal for cancellation
  */
 export async function parseModbusRegistersFromContext(
-  context: string
+  context: string,
+  signal?: AbortSignal
 ): Promise<ModbusRegister[]> {
   const prompt = `${BATCH_EXTRACTION_PROMPT}
 
@@ -78,12 +82,40 @@ ${context}`;
 
   try {
     log.debug("Sending context to Claude", { contextLength: context.length });
-    
-    const response = await anthropic.messages.create({
-      model: DEFAULT_MODEL,
-      max_tokens: 8192, // Increased for larger register sets
-      messages: [{ role: "user", content: prompt }],
-    });
+
+    // Wrap Claude API call with retry logic (2 retries for expensive API calls)
+    const response = await withRetry(
+      async () => {
+        return await anthropic.messages.create(
+          {
+            model: DEFAULT_MODEL,
+            max_tokens: 8192, // Increased for larger register sets
+            messages: [{ role: "user", content: prompt }],
+          },
+          { signal }
+        );
+      },
+      {
+        maxRetries: 2, // Only 2 retries for expensive Claude API calls
+        initialDelayMs: 2000,
+        maxDelayMs: 8000,
+        retryableErrors: (error) => {
+          if (error instanceof Error) {
+            // Don't retry on abort
+            if (error.name === "AbortError") return false;
+
+            const message = error.message.toLowerCase();
+            // Retry on rate limits, overloaded errors, and server errors
+            return message.includes("rate") ||
+                   message.includes("429") ||
+                   message.includes("503") ||
+                   message.includes("overloaded") ||
+                   message.includes("timeout");
+          }
+          return false;
+        },
+      }
+    );
 
     const content = response.content[0];
     if (content.type !== "text") {

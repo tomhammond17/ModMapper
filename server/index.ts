@@ -2,18 +2,80 @@
 // This ensures DOMMatrix is available before pdfjs-dist loads
 import "./pdf-parser/polyfills";
 
+// Validate environment variables before anything else
+import { validateEnv } from "./config/env";
+const env = validateEnv();
+
 import express, { type Request, Response, NextFunction } from "express";
 import compression from "compression";
+import helmet from "helmet";
+import cors from "cors";
 import { registerSSERoutes, registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
-import { logger, logRequest } from "./logger";
+import { logger, logRequest, createLogger } from "./logger";
+
+const log = createLogger("server");
 
 const app = express();
 
 // Trust first proxy (required for Replit and other proxy environments)
 // This ensures express-rate-limit correctly identifies clients via X-Forwarded-For header
 app.set("trust proxy", 1);
+
+// Security headers middleware - protect against common web vulnerabilities
+app.use(helmet({
+  contentSecurityPolicy: env.NODE_ENV === "production" ? {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"], // Allow inline styles for dynamic theming
+      imgSrc: ["'self'", "data:", "blob:"],
+      fontSrc: ["'self'", "data:"],
+      connectSrc: ["'self'"],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: [],
+    },
+  } : false, // Disable CSP in development for HMR
+  hsts: env.NODE_ENV === "production" ? {
+    maxAge: 31536000, // 1 year
+    includeSubDomains: true,
+    preload: true,
+  } : false,
+  frameguard: { action: "deny" }, // Prevent clickjacking
+  noSniff: true, // Prevent MIME sniffing
+  xssFilter: true, // Enable XSS filter (legacy browsers)
+}));
+
+// CORS configuration - control which origins can access the API
+const allowedOrigins = env.ALLOWED_ORIGINS
+  ? env.ALLOWED_ORIGINS.split(",").map(o => o.trim())
+  : env.NODE_ENV === "production"
+    ? [] // No origins allowed by default in production (must set ALLOWED_ORIGINS)
+    : ["http://localhost:5000", "http://localhost:5173"]; // Vite dev server
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, Postman, curl)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.length === 0 && env.NODE_ENV === "production") {
+      log.warn("CORS: No allowed origins configured in production", { origin });
+      return callback(new Error("Not allowed by CORS - configure ALLOWED_ORIGINS"));
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      log.warn("CORS blocked request from unauthorized origin", { origin, allowedOrigins });
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Accept"],
+}));
 
 const httpServer = createServer(app);
 
