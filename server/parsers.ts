@@ -1,5 +1,24 @@
 import type { ModbusRegister, ModbusFileFormat } from "@shared/schema";
 import { normalizeDataType, parseBoolean } from "./utils/datatype";
+import { XMLParser } from "fast-xml-parser";
+
+/**
+ * Sanitize CSV values to prevent formula injection attacks
+ * Excel/LibreOffice/Google Sheets treat cells starting with =+-@\t\r as formulas
+ */
+function sanitizeCSVValue(value: string): string {
+  if (!value) return value;
+
+  const trimmed = value.trim();
+
+  // Check if value starts with dangerous characters
+  if (/^[=+\-@\t\r]/.test(trimmed)) {
+    // Prefix with single quote to treat as text
+    return "'" + trimmed;
+  }
+
+  return value;
+}
 
 export function parseCSV(content: string): ModbusRegister[] {
   const lines = content.trim().split(/\r?\n/);
@@ -35,9 +54,9 @@ export function parseCSV(content: string): ModbusRegister[] {
 
     registers.push({
       address,
-      name: nameIdx >= 0 ? (values[nameIdx]?.trim() || `Register_${address}`) : `Register_${address}`,
+      name: nameIdx >= 0 ? sanitizeCSVValue(values[nameIdx]?.trim() || `Register_${address}`) : `Register_${address}`,
       datatype: datatypeIdx >= 0 ? normalizeDataType(values[datatypeIdx] || "UINT16") : "UINT16",
-      description: descIdx >= 0 ? (values[descIdx]?.trim() || "") : "",
+      description: descIdx >= 0 ? sanitizeCSVValue(values[descIdx]?.trim() || "") : "",
       writable: writableIdx >= 0 ? parseBoolean(values[writableIdx]) : false,
     });
   }
@@ -124,61 +143,65 @@ export function parseJSON(content: string): ModbusRegister[] {
 export function parseXML(content: string): ModbusRegister[] {
   const registers: ModbusRegister[] = [];
 
-  const registerPattern = /<register[^>]*>([\s\S]*?)<\/register>/gi;
-  let match: RegExpExecArray | null;
-
-  while ((match = registerPattern.exec(content)) !== null) {
-    const registerContent = match[1];
-
-    const address = extractXMLValue(registerContent, "address");
-    const addressNum = parseInt(address || "", 10);
-    if (isNaN(addressNum)) continue;
-
-    registers.push({
-      address: addressNum,
-      name: extractXMLValue(registerContent, "name") || `Register_${addressNum}`,
-      datatype: normalizeDataType(extractXMLValue(registerContent, "datatype") || extractXMLValue(registerContent, "type") || "UINT16"),
-      description: extractXMLValue(registerContent, "description") || extractXMLValue(registerContent, "desc") || "",
-      writable: parseBoolean(extractXMLValue(registerContent, "writable") || extractXMLValue(registerContent, "write") || "false"),
+  try {
+    const parser = new XMLParser({
+      ignoreAttributes: false,
+      attributeNamePrefix: "@_",
+      textNodeName: "#text",
+      parseAttributeValue: true,
+      trimValues: true,
+      allowBooleanAttributes: true,
     });
-  }
 
-  if (registers.length === 0) {
-    const rowPattern = /<row[^>]*>([\s\S]*?)<\/row>/gi;
-    while ((match = rowPattern.exec(content)) !== null) {
-      const rowContent = match[1];
+    const result = parser.parse(content);
 
-      const address = extractXMLValue(rowContent, "address");
-      const addressNum = parseInt(address || "", 10);
+    // Handle different root structures
+    let registerArray: any[] = [];
+
+    if (result.registers?.register) {
+      registerArray = Array.isArray(result.registers.register)
+        ? result.registers.register
+        : [result.registers.register];
+    } else if (result.modbus?.register) {
+      registerArray = Array.isArray(result.modbus.register)
+        ? result.modbus.register
+        : [result.modbus.register];
+    } else if (result.register) {
+      registerArray = Array.isArray(result.register)
+        ? result.register
+        : [result.register];
+    } else if (result.rows?.row) {
+      registerArray = Array.isArray(result.rows.row)
+        ? result.rows.row
+        : [result.rows.row];
+    } else if (result.row) {
+      registerArray = Array.isArray(result.row)
+        ? result.row
+        : [result.row];
+    }
+
+    for (const item of registerArray) {
+      const addressNum = typeof item.address === "number"
+        ? item.address
+        : parseInt(String(item.address || ""), 10);
+
       if (isNaN(addressNum)) continue;
 
       registers.push({
         address: addressNum,
-        name: extractXMLValue(rowContent, "name") || `Register_${addressNum}`,
-        datatype: normalizeDataType(extractXMLValue(rowContent, "datatype") || extractXMLValue(rowContent, "type") || "UINT16"),
-        description: extractXMLValue(rowContent, "description") || extractXMLValue(rowContent, "desc") || "",
-        writable: parseBoolean(extractXMLValue(rowContent, "writable") || extractXMLValue(rowContent, "write") || "false"),
+        name: item.name || `Register_${addressNum}`,
+        datatype: normalizeDataType(item.datatype || item.type || "UINT16"),
+        description: item.description || item.desc || "",
+        writable: parseBoolean(item.writable || item.write || "false"),
       });
     }
+  } catch (error) {
+    throw new Error(`Invalid XML format: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
 
   return registers;
 }
 
-function extractXMLValue(xml: string, tagName: string): string | null {
-  const pattern = new RegExp(`<${tagName}[^>]*>([\\s\\S]*?)<\\/${tagName}>`, "i");
-  const match = pattern.exec(xml);
-  if (match) {
-    return match[1]
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, '"')
-      .replace(/&apos;/g, "'")
-      .trim();
-  }
-  return null;
-}
 
 export function detectFormat(filename: string): ModbusFileFormat {
   const ext = filename.split(".").pop()?.toLowerCase();
