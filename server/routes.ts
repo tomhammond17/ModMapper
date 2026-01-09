@@ -83,7 +83,7 @@ export async function registerSSERoutes(
   // Rate limited: 10 requests per 15 minutes (expensive Claude API calls)
   // Uses validation middleware: validatePdfFile
   // Supports cancellation via client disconnect
-  app.post("/api/parse-pdf-stream", pdfParseLimiter, upload.single("file"), handleMulterError, validatePdfFile, async (req: Request, res: Response) => {
+  app.post("/api/v1/parse-pdf-stream", pdfParseLimiter, upload.single("file"), handleMulterError, validatePdfFile, async (req: Request, res: Response) => {
     // File validated by middleware
     const filename = req.file!.originalname;
 
@@ -191,7 +191,7 @@ export async function registerSSERoutes(
   // Rate limited: 10 requests per 15 minutes (expensive Claude API calls)
   // Uses validation middleware: validatePdfFile, validatePageRanges
   // Supports cancellation via client disconnect
-  app.post("/api/parse-pdf-with-hints", pdfParseLimiter, upload.single("file"), handleMulterError, validatePdfFile, validatePageRanges, async (req: Request, res: Response) => {
+  app.post("/api/v1/parse-pdf-with-hints", pdfParseLimiter, upload.single("file"), handleMulterError, validatePdfFile, validatePageRanges, async (req: Request, res: Response) => {
     // File and page ranges validated by middleware
     const filename = req.file!.originalname;
     const pageHints = parsePageRanges(req.body.pageRanges);
@@ -293,7 +293,7 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   // Parse regular files (CSV, JSON, XML)
-  app.post("/api/parse", fileParseLimiter, upload.single("file"), handleMulterError, async (req: Request, res: Response) => {
+  app.post("/api/v1/parse", fileParseLimiter, upload.single("file"), handleMulterError, async (req: Request, res: Response) => {
     try {
       if (!req.file) {
         return res.status(400).json({
@@ -414,7 +414,7 @@ export async function registerRoutes(
   // Analyze PDF for page suggestions (lightweight scoring, no LLM calls)
   // Rate limited: 30 requests per 15 minutes (cheaper than parsing)
   // Uses validation middleware: validatePdfFile
-  app.post("/api/analyze-pdf", fileParseLimiter, upload.single("file"), handleMulterError, validatePdfFile, async (req: Request, res: Response) => {
+  app.post("/api/v1/analyze-pdf", fileParseLimiter, upload.single("file"), handleMulterError, validatePdfFile, async (req: Request, res: Response) => {
     try {
       const { metadata, hints, totalPages } = await scoreAllPagesLightweight(req.file!.buffer);
 
@@ -447,7 +447,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/documents", documentLimiter, async (req, res) => {
+  app.get("/api/v1/documents", documentLimiter, async (req, res) => {
     try {
       const documents = await storage.getAllDocuments();
       return res.json({ success: true, documents });
@@ -459,7 +459,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/documents/:id", documentLimiter, async (req, res) => {
+  app.get("/api/v1/documents/:id", documentLimiter, async (req, res) => {
     try {
       const document = await storage.getDocument(req.params.id);
       if (!document) {
@@ -477,7 +477,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/documents/:id", documentLimiter, async (req, res) => {
+  app.delete("/api/v1/documents/:id", documentLimiter, async (req, res) => {
     try {
       const deleted = await storage.deleteDocument(req.params.id);
       if (!deleted) {
@@ -495,8 +495,47 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/health", (req, res) => {
-    return res.json({ status: "healthy", service: "modbus-converter" });
+  app.get("/api/v1/health", (req, res) => {
+    return res.json({ status: "healthy", service: "modbus-converter", version: "v1" });
+  });
+
+  // Legacy routes (backward compatibility) - redirect to v1
+  app.use("/api/parse*", (req, res, next) => {
+    if (!req.path.startsWith("/api/v1/")) {
+      const newPath = req.path.replace("/api/", "/api/v1/");
+      log.warn("Legacy API endpoint used, redirecting", { oldPath: req.path, newPath });
+      res.redirect(307, newPath + (req.url.includes("?") ? req.url.substring(req.url.indexOf("?")) : ""));
+    } else {
+      next();
+    }
+  });
+
+  app.use("/api/documents*", (req, res, next) => {
+    if (!req.path.startsWith("/api/v1/")) {
+      const newPath = req.path.replace("/api/", "/api/v1/");
+      log.warn("Legacy API endpoint used, redirecting", { oldPath: req.path, newPath });
+      res.redirect(307, newPath);
+    } else {
+      next();
+    }
+  });
+
+  app.use("/api/analyze-pdf", (req, res, next) => {
+    if (!req.path.startsWith("/api/v1/")) {
+      const newPath = req.path.replace("/api/", "/api/v1/");
+      log.warn("Legacy API endpoint used, redirecting", { oldPath: req.path, newPath });
+      res.redirect(307, newPath);
+    } else {
+      next();
+    }
+  });
+
+  app.use("/api/health", (req, res, next) => {
+    if (!req.path.startsWith("/api/v1/")) {
+      res.redirect(307, "/api/v1/health");
+    } else {
+      next();
+    }
   });
 
   return httpServer;
