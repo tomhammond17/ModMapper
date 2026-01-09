@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { pgTable, uuid, text, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, jsonb, index } from "drizzle-orm/pg-core";
 
 export const modbusDataTypes = [
   "INT16",
@@ -53,7 +53,12 @@ export const documentsTable = pgTable("documents", {
   sourceFormat: text("source_format").notNull(),
   registers: jsonb("registers").notNull().$type<ModbusRegister[]>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  // Add indexes for common query patterns
+  filenameIdx: index("filename_idx").on(table.filename),
+  createdAtIdx: index("created_at_idx").on(table.createdAt),
+  sourceFormatIdx: index("source_format_idx").on(table.sourceFormat),
+}));
 
 export interface ExtractionMetadata {
   totalPages: number;

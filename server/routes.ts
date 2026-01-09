@@ -495,8 +495,17 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/v1/health", (req, res) => {
-    return res.json({ status: "healthy", service: "modbus-converter", version: "v1" });
+  app.get("/api/v1/health", async (req, res) => {
+    const { checkDatabaseConnection } = await import("./db");
+    const dbHealthy = await checkDatabaseConnection();
+
+    return res.json({
+      status: "healthy",
+      service: "modbus-converter",
+      version: "v1",
+      database: dbHealthy ? "connected" : "in-memory",
+      timestamp: new Date().toISOString(),
+    });
   });
 
   // Legacy routes (backward compatibility) - redirect to v1
