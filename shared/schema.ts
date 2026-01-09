@@ -63,6 +63,8 @@ export interface ExtractionMetadata {
   highRelevancePages: number;
   processingTimeMs: number;
   batchSummary?: string;
+  processingErrors?: Array<{ batch: number; pages: string; error: string }>;
+  partialExtraction?: boolean;
 }
 
 export interface ConversionResult {

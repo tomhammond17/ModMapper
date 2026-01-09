@@ -74,21 +74,24 @@ interface BatchResult {
 async function extractBatch(
   pages: PageData[],
   batchNum: number,
-  hints: DocumentHint[]
+  hints: DocumentHint[],
+  signal?: AbortSignal
 ): Promise<BatchResult> {
+  checkAborted(signal);
+
   const pageNums = pages.map(p => p.pageNum);
-  const pageRange = pageNums.length === 1 
-    ? `${pageNums[0]}` 
+  const pageRange = pageNums.length === 1
+    ? `${pageNums[0]}`
     : `${pageNums[0]}-${pageNums[pageNums.length - 1]}`;
-  
+
   // Build context for this batch
   let context = "";
-  
+
   if (hints.length > 0 && batchNum === 1) {
-    context += "DOCUMENT CONVENTIONS:\n" + 
+    context += "DOCUMENT CONVENTIONS:\n" +
       hints.slice(0, 3).map(h => `- ${h.type}: ${h.context}`).join("\n") + "\n\n";
   }
-  
+
   for (const page of pages) {
     context += `--- PAGE ${page.pageNum} ---\n`;
     if (page.sectionTitle) {
@@ -96,10 +99,10 @@ async function extractBatch(
     }
     context += page.text + "\n\n";
   }
-  
+
   log.debug("Processing batch", { batch: batchNum, pages: pageRange, contextLength: context.length });
-  
-  const registers = await parseModbusRegistersFromContext(context);
+
+  const registers = await parseModbusRegistersFromContext(context, signal);
   
   log.info("Batch complete", { batch: batchNum, pages: pageRange, registersFound: registers.length });
   
@@ -221,6 +224,7 @@ export async function parsePdfFile(
     const totalBatches = batches.length;
     const allRegisters: ModbusRegister[] = [];
     const batchResults: BatchResult[] = [];
+    const batchErrors: Array<{ batch: number; pages: string; error: string }> = [];
 
     onProgress?.({
       stage: "parsing",
@@ -258,7 +262,7 @@ export async function parsePdfFile(
       });
 
       try {
-        const result = await extractBatch(batch, batchNum, hints);
+        const result = await extractBatch(batch, batchNum, hints, signal);
         batchResults.push(result);
         allRegisters.push(...result.registers);
 
@@ -280,7 +284,17 @@ export async function parsePdfFile(
         if (isAbortError(batchError)) {
           throw batchError;
         }
-        log.error("Batch processing error", { batch: batchNum, error: batchError instanceof Error ? batchError.message : String(batchError) });
+
+        // Track the error to report to user
+        const errorMessage = batchError instanceof Error ? batchError.message : "Unknown error";
+        log.error("Batch processing error", { batch: batchNum, pages: pageRange, error: errorMessage });
+
+        batchErrors.push({
+          batch: batchNum,
+          pages: pageRange,
+          error: errorMessage,
+        });
+
         // Continue with other batches even if one fails
       }
     }
@@ -324,6 +338,8 @@ export async function parsePdfFile(
       confidenceLevel: calculateConfidenceLevel(registers.length, highPages.length, totalPages),
       processingTimeMs,
       batchSummary,
+      processingErrors: batchErrors.length > 0 ? batchErrors : undefined,
+      partialExtraction: batchErrors.length > 0,
     };
 
     return { registers, metadata };
@@ -465,7 +481,8 @@ export async function parsePdfWithPageHints(
     const totalBatches = batches.length;
     const allRegisters: ModbusRegister[] = [];
     const batchResults: BatchResult[] = [];
-    
+    const batchErrors: Array<{ batch: number; pages: string; error: string }> = [];
+
     onProgress?.({
       stage: "parsing",
       progress: 20,
@@ -501,7 +518,7 @@ export async function parsePdfWithPageHints(
       });
       
       try {
-        const result = await extractBatch(batch, batchNum, hints);
+        const result = await extractBatch(batch, batchNum, hints, signal);
         batchResults.push(result);
         allRegisters.push(...result.registers);
         
@@ -520,7 +537,18 @@ export async function parsePdfWithPageHints(
         if (isAbortError(batchError)) {
           throw batchError;
         }
-        log.error("Batch processing error", { batch: batchNum, error: batchError instanceof Error ? batchError.message : String(batchError) });
+
+        // Track the error to report to user
+        const errorMessage = batchError instanceof Error ? batchError.message : "Unknown error";
+        log.error("Batch processing error", { batch: batchNum, pages: pageRange, error: errorMessage });
+
+        batchErrors.push({
+          batch: batchNum,
+          pages: pageRange,
+          error: errorMessage,
+        });
+
+        // Continue with other batches even if one fails
       }
     }
 
@@ -555,6 +583,8 @@ export async function parsePdfWithPageHints(
       confidenceLevel: calculateConfidenceLevel(mergedRegisters.length, targetPages.length, totalPages),
       processingTimeMs,
       batchSummary,
+      processingErrors: batchErrors.length > 0 ? batchErrors : undefined,
+      partialExtraction: batchErrors.length > 0,
     };
 
     return { registers: mergedRegisters, metadata };
