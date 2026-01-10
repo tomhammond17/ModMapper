@@ -12,6 +12,7 @@ import helmet from "helmet";
 import cors from "cors";
 import { registerSSERoutes, registerRoutes } from "./routes";
 import { registerAuthRoutes } from "./routes/auth";
+import { registerBillingRoutes, handleStripeWebhook } from "./routes/billing";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { logger, logRequest, createLogger } from "./logger";
@@ -140,6 +141,11 @@ app.use((req, res, next) => {
   next();
 });
 
+// Register Stripe webhook BEFORE JSON body parser (needs raw body)
+// This route uses express.raw() internally for signature verification
+app.use("/api/v1/billing/webhook", express.raw({ type: "application/json" }));
+handleStripeWebhook(app);
+
 // Parse JSON and urlencoded bodies for all routes
 app.use(
   express.json({
@@ -167,6 +173,11 @@ app.use(express.urlencoded({ extended: false }));
   registerAuthRoutes(app, {
     appUrl: env.APP_URL,
     fromEmail: env.FROM_EMAIL || "noreply@modmapper.com",
+  });
+
+  // Register billing routes
+  registerBillingRoutes(app, {
+    appUrl: env.APP_URL,
   });
 
   // Register remaining routes (after compression so they get compressed)
