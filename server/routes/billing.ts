@@ -19,6 +19,7 @@ import {
   updateSubscriptionPeriod,
   updateSubscriptionByStripeCustomer,
 } from "../services/subscription";
+import { getUsageWithLimits } from "../services/usage";
 import { requireAuth, loadSubscription, requirePro } from "../middleware/auth";
 import { createLogger } from "../logger";
 
@@ -215,6 +216,34 @@ export function registerBillingRoutes(
           success: false,
           error: "INTERNAL_ERROR",
           message: "Failed to get subscription status",
+        });
+      }
+    }
+  );
+
+  /**
+   * GET /api/v1/billing/usage
+   * Get current usage statistics with limits
+   */
+  app.get(
+    "/api/v1/billing/usage",
+    requireAuth,
+    loadSubscription,
+    async (req: Request, res: Response) => {
+      try {
+        const tier = req.subscription?.tier || "free";
+        const usage = await getUsageWithLimits(req.user!.id, tier);
+
+        res.json({
+          success: true,
+          ...usage,
+        });
+      } catch (error) {
+        log.error("Usage error", { error });
+        res.status(500).json({
+          success: false,
+          error: "INTERNAL_ERROR",
+          message: "Failed to get usage statistics",
         });
       }
     }

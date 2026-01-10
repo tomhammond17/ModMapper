@@ -12,6 +12,8 @@ import type { ConversionResult, ModbusSourceFormat, ModbusRegister } from "@shar
 import { createLogger } from "./logger";
 import { validateFileContent, validatePdfFile, validatePageRanges } from "./middleware/validation";
 import { isAbortError } from "./pdf-parser";
+import { optionalAuth, loadSubscription } from "./middleware/auth";
+import { usageMiddleware } from "./middleware/usage";
 
 const log = createLogger("routes");
 
@@ -83,7 +85,8 @@ export async function registerSSERoutes(
   // Rate limited: 10 requests per 15 minutes (expensive Claude API calls)
   // Uses validation middleware: validatePdfFile
   // Supports cancellation via client disconnect
-  app.post("/api/v1/parse-pdf-stream", pdfParseLimiter, upload.single("file"), handleMulterError, validatePdfFile, async (req: Request, res: Response) => {
+  // Usage middleware: tracks for authenticated users, allows anonymous
+  app.post("/api/v1/parse-pdf-stream", pdfParseLimiter, optionalAuth, loadSubscription, usageMiddleware, upload.single("file"), handleMulterError, validatePdfFile, async (req: Request, res: Response) => {
     // File validated by middleware
     const filename = req.file!.originalname;
 
@@ -191,7 +194,8 @@ export async function registerSSERoutes(
   // Rate limited: 10 requests per 15 minutes (expensive Claude API calls)
   // Uses validation middleware: validatePdfFile, validatePageRanges
   // Supports cancellation via client disconnect
-  app.post("/api/v1/parse-pdf-with-hints", pdfParseLimiter, upload.single("file"), handleMulterError, validatePdfFile, validatePageRanges, async (req: Request, res: Response) => {
+  // Usage middleware: tracks for authenticated users, allows anonymous
+  app.post("/api/v1/parse-pdf-with-hints", pdfParseLimiter, optionalAuth, loadSubscription, usageMiddleware, upload.single("file"), handleMulterError, validatePdfFile, validatePageRanges, async (req: Request, res: Response) => {
     // File and page ranges validated by middleware
     const filename = req.file!.originalname;
     const pageHints = parsePageRanges(req.body.pageRanges);
@@ -292,8 +296,9 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Parse regular files (CSV, JSON, XML)
-  app.post("/api/v1/parse", fileParseLimiter, upload.single("file"), handleMulterError, async (req: Request, res: Response) => {
+  // Parse regular files (CSV, JSON, XML, PDF)
+  // Usage middleware: tracks for authenticated users, allows anonymous
+  app.post("/api/v1/parse", fileParseLimiter, optionalAuth, loadSubscription, usageMiddleware, upload.single("file"), handleMulterError, async (req: Request, res: Response) => {
     try {
       if (!req.file) {
         return res.status(400).json({
