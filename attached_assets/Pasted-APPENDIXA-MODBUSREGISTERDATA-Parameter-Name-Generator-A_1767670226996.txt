@@ -1,0 +1,1286 @@
+APPENDIXA MODBUSREGISTERDATA
+      Parameter Name
+Generator Average Line-Line AC RMS Voltage
+Generator Average AC RMS Current Generator Average AC RMS Frequency Generator Overall Power Factor Generator Overall Power Factor Lagging Generator Total Percent kW
+Generator Total Real Power
+Generator Phase A Line-Line AC RMS Voltage
+Generator Phase B Line-Line AC RMS Voltage
+Generator Phase C Line-Line AC RMS Voltage
+0x0063 1 0x0064 1 0x0065 1 0x0066 1 0x0067 1 0x0068 1
+0x0069 2
+0x006B 1 0x006C 1 0x006D 1 0x006E 1 0x006F 1 0x0070 1 0x0071 1 0x0072 1 0x0073 1
+0x0074 2
+0x0076 2
+0x0078 2
+0x007A 2
+0x007C 2
+0x007E 2
+0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ●
+0 ● ● ● 0 ● ● ●
+0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ●
+0 ● ● ●
+0 ● ● ●
+0 ● ● ●
+0 ● ● ●
+0 ● ● ●
+0 ● ● ●
+Scaling: 1 V/bit, Offset: 0 V, Data range: 0 to 64255 V
+Scaling: 1 A/bit, Offset: 0 A, Data range: 0 to 64255 A
+Scaling: 1/128 Hz/bit, Offset: 0 Hz, Data range: 0 to 501.9922 Hz
+Scaling: 1/16384 /bit, Offset: -1.0, Data range: -1.0 to 1.0
+0 = Power factor leading 1 = Power factor lagging
+Scaling: 0.0078125 %/bit, Offset: -251 %, Data range: -251 to 250.99 %
+Scaling: 1 W/bit, Offset: -2,000,000,000 W, Data range: -2,000,000,000 to +2,211,081,215 W
+Scaling: 1 V/bit, Offset: 0 V, Data range: 0 to 64255 V
+Scaling: 1 V/bit, Offset: 0 V, Data range: 0 to 64255 V
+Scaling: 1 V/bit, Offset: 0 V, Data range: 0 to 64255 V
+Scaling: 1 A/bit, Offset: 0 A, Data range: 0 to 64255 A
+Scaling: 1 A/bit, Offset: 0 A, Data range: 0 to 64255 A
+Scaling: 1 A/bit, Offset: 0 A, Data range: 0 to 64255 A
+Scaling: 1 V/bit, Offset: 0 V, Data range: 0 to 64255 V
+Scaling: 1 V/bit, Offset: 0 V, Data range: 0 to 64255 V
+Scaling: 1 V/bit, Offset: 0 V, Data range: 0 to 64255 V
+Scaling: 1 W/bit, Offset: -2,000,000,000 W, Data range: -2,000,000,000 to +2,211,081,215 W
+Scaling: 1 W/bit, Offset: -2,000,000,000 W, Data range: -2,000,000,000 to +2,211,081,215 W
+Scaling: 1 W/bit, Offset: -2,000,000,000 W, Data range: -2,000,000,000 to +2,211,081,215 W
+Scaling: 1 VA/bit, Offset: -2,000,000,000 VA, Data range: -2,000,000,000 to +2,211,081,215 VA
+Scaling: 1 VA/bit, Offset: -2,000,000,000 VA, Data range: -2,000,000,000 to +2,211,081,215 VA
+Scaling: 1 VA/bit, Offset: -2,000,000,000 VA, Data range: -2,000,000,000 to +2,211,081,215 VA
+Page 49
+R/W
+R 100 R 101 R 102 R 103 R 104 R 105
+R 106
+R 108 R 109 R 110 R 111 R 112 R 113 R 114 R 115 R 116
+R 117
+R 119
+R 121
+R 123
+R 125
+R 127
+Ct Sec 4.2 4.3 4.4 Lvl
+Holding Register
+Data Interpretation
+                                 Generator Phase A AC RMS Current
+Generator Phase B AC RMS Current
+Generator Phase C AC RMS Current
+Generator Phase A Line-Neutral AC Voltage
+Generator Phase B Line-Neutral AC Voltage
+Generator Phase C Line-Neutral AC Voltage
+Generator Phase A Real Power
+Generator Phase B Real Power
+Generator Phase C Real Power
+Generator Phase A Apparent Power
+Generator Phase B Apparent Power
+Generator Phase C Apparent Power
+©2010 Caterpillar All rights reserved.
+RMS RMS RMS
+                                    
+Application and Installation Guide
+EMCP 4 SCADA Data Links
+         Parameter Name
+Generator Phase A Reactive Power
+Generator Phase B Reactive Power
+Generator Phase C Reactive Power
+Generator Phase A Power Factor Generator Phase B Power Factor Generator Phase C Power Factor
+Generator Total Apparent Power
+Generator Total Percent Apparent Power
+Generator Total Reactive Power
+Generator Total Percent Reactive Power
+Generator Total Real Energy Exported
+Generator Total Reactive Energy Exported
+Generator Average Line-Neutral AC RMS Voltage
+Generator Front Bearing Temperature from Data Link
+Generator Rear Bearing Temperature from Data Link
+Generator Phase A Winding Temperature from Data Link
+Generator Phase B Winding Temperature from Data Link
+Generator Phase C Winding Temperature from Data Link
+Generator Phase A Power Factor Lagging
+Generator Phase B Power Factor Lagging
+Generator Phase C Power Factor Lagging
+Generator Rear Bearing Temperature from I/O Pin
+Generator Average Line-Line AC RMS Voltage Percent
+Bus Average Line-Line AC RMS Voltage
+©2010 Caterpillar All rights reserved.
+0x0080 2 0 ●
+0x0082 2 0 ●
+0x0084 2 0 ● 0x0086 1 0 ●
+0x0087 1 0 ● 0x0088 1 0 ●
+0x0089 2 0 ●
+0x008B 1 0 ●
+0x008C 2 0 ●
+0x008E 1 0 ● 0x008F 2 0 ● 0x0091 2 0 ● 0x0093 1 0 ● 0x0094 1 0 ● 0x0095 1 0 ● 0x0096 1 0 ● 0x0097 1 0 ● 0x0098 1 0 ● 0x009E 1 0 ● 0x009F 1 0 ● 0x00A0 1 0 ● 0x00A1 1 0 ● 0x00A2 1 0 ● 0x00A3 1 0
+● ●
+● ●
+● ●
+● ● ● ● ● ●
+● ●
+● ●
+● ●
+● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ●
+●
+Scaling: 1 VAr/bit, Offset: -2,000,000,000 VAr, Data range: -2,000,000,000 to +2,211,081,215 VAr
+Scaling: 1 VAr/bit, Offset: -2,000,000,000 VAr, Data range: -2,000,000,000 to +2,211,081,215 VAr
+Scaling: 1 VAr/bit, Offset: -2,000,000,000 VAr, Data range: -2,000,000,000 to +2,211,081,215 VAr
+Scaling: 1/16384 /bit, Offset: -1.0, Data range: -1.0 to 1.0
+Scaling: 1/16384 /bit, Offset: -1.0, Data range: -1.0 to 1.0
+Scaling: 1/16384 /bit, Offset: -1.0, Data range: -1.0 to 1.0
+Scaling: 1 VA/bit, Offset: -2,000,000,000 VA, Data range: -2,000,000,000 to +2,211,081,215 VA
+Scaling: 0.0078125 %/bit, Offset: -251 %, Data range: -251 to 250.99 %
+Scaling: 1 VAr/bit, Offset: -2,000,000,000 VAr, Data range: -2,000,000,000 to +2,211,081,215 VAr
+Scaling: 0.0078125 %/bit, Offset: -251 %, Data range: -251 to 250.99 %
+Scaling: 1 kWh/bit, Offset: 0 kWh, Data range: 0 to 4,211,081,215 kWh
+Scaling: 1 kVArh/bit, Offset: 0 kVArh, Data range: 0 to 4,211,081,215 kVArh
+Scaling: 1 V/bit, Offset: 0 V, Data range: 0 to 64255 V
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+0 = Power factor leading 1 = Power factor lagging
+0 = Power factor leading 1 = Power factor lagging
+0 = Power factor leading 1 = Power factor lagging
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.0078125 %/bit, Offset: -251 %, Data range: -251 to 250.99 %
+Scaling: 1 V/bit, Offset: 0 V, Data range: 0 to 64255 V
+Page 50
+R/W
+R 129
+R 131
+R 133
+R 135 R 136 R 137
+R 138
+R 140
+R 141
+R 143 R 144 R 146 R 148 R 149 R 150 R 151 R 152 R 153 R 159 R 160 R 161 R 162 R 163 R 164
+Ct Sec 4.2 4.3 4.4 Lvl
+Holding Register
+Data Interpretation
+                                                                           
+Application and Installation Guide
+EMCP 4 SCADA Data Links
+         Parameter Name
+Bus Average AC RMS Frequency
+Bus Phase A Line-Line AC RMS Voltage
+Bus Phase B Line-Line AC RMS Voltage
+Bus Phase C Line-Line AC RMS Voltage
+Bus Phase A Line-Neutral AC RMS Voltage
+Bus Phase B Line-Neutral AC RMS Voltage
+Bus Phase C Line-Neutral AC RMS Voltage
+Bus Average Line-Neutral AC RMS Voltage
+Bus Average Line-Line AC RMS Voltage Percent
+Generator Total Percent Current Utility Total Real Power
+Utility Total Reactive Power
+Utility Overall Power Factor Generator Desired Power Factor
+Desired Base Load
+Load Share Line Total Percent kW
+Load Share Line Total Percent kVAr
+Generator Average AC RMS Frequency Percent
+Fuel Level
+Engine Oil Temperature
+Engine Oil Pressure
+Engine Coolant Temperature Battery Voltage
+Engine rpm
+Engine Operating Hours
+©2010 Caterpillar All rights reserved.
+0x00A4 1 0 0x00A5 1 0 0x00A6 1 0 0x00A7 1 0 0x00A8 1 0 0x00A9 1 0 0x00AA 1 0 0x00AB 1 0 0x00AC 1 0 0x00AD 1 0
+0x00AE 1 0
+0x00AF 1 0
+0x00B0 1 0 0x00B1 1 0
+0x00B2 1 0
+0x00B4 1 0 0x00B5 1 0 0x00B6 1 0 0x00C5 1 0
+0x00C6 1 0
+0x00C7 1 0 0x00C8 1 0 0x00C9 1 0 0x00CA 1 0 0x00CB 2 0
+●
+● Scaling: 1 V/bit, Offset: 0 V, Data
+range: 0
+range: 0
+range: 0
+range: 0
+range: 0
+range: 0
+range: 0
+-251 %, %
+R/W
+R 165 R 166 R 167 R 168 R 169 R 170 R 171 R 172 R 173 R 174
+R 175
+R 176
+R 177 R 178
+R 179
+R 181 R 182 R 183 R 198
+R 199
+R 200 R 201 R 202 R 203 R 204
+Ct Sec 4.2 4.3 4.4 Lvl
+Holding Register
+Data Interpretation
+   Scaling: 1/128 Hz/bit, Offset: 0 Hz, Data range: 0 to 501.9922 Hz
+   to 64255 V
+● Scaling: 1 V/bit, Offset: 0 V, Data to 64255 V
+● Scaling: 1 V/bit, Offset: 0 V, Data to 64255 V
+● Scaling: 1 V/bit, Offset: 0 V, Data to 64255 V
+● Scaling: 1 V/bit, Offset: 0 V, Data to 64255 V
+● Scaling: 1 V/bit, Offset: 0 V, Data to 64255 V
+● Scaling: 1 V/bit, Offset: 0 V, Data to 64255 V
+● Scaling: 0.0078125 %/bit, Offset: Data range: -251 to 250.99
+                        ●
+Scaling: 0.0078125 %/bit, Offset: Data range: -251 to 250.99
+-251 %, %
+● ●
+● W, Data range: -2,000,000,000 to
+   Scaling: 1 W/bit, Offset: -2,000,000,000
++2,211,081,215 W
+Scaling: 1 VAr/bit, Offset: -2,000,000,000 ● VAr, Data range: -2,000,000,000 to
++2,211,081,215 VAr
+Scaling: 1/16384 /bit, Offset: -1.0, Data range: -1.0 to 1.0
+Scaling: 1/16384 /bit, Offset: -1.0, Data range: -1.0 to 1.0
+      ● ●
+      Scaling: 1 W/bit, Offset: -2,000,000,000 ● W, Data range: -2,000,000,000 to
++2,211,081,215 W
+Scaling: 0.0078125 %/bit, Offset: -251 %, Data range: -251 to 250.99 %
+Scaling: 0.0078125 %/bit, Offset: -251 %, Data range: -251 to 250.99 %
+   ● ●
+      ● ●
+●
+● ● ● ● ●
+● Scaling: 0.0078125 %/bit, Offset: -251 %, Data range: -251 to 250.99 %
+●
+● ●
+● ●
+Scaling: 0.0078125 %/bit, Offset: -251 %, Data range: -251 to 250.99 %
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+         ●
+● Scaling: 0.125 kPa/bit, Offset: 0 kPa, Data range: 0 to 8031.875 kPa
+   ● ●
+● ●
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.05 V/bit, Offset: 0 V, Data range: 0 to 3212.75 V
+      ●
+● ●
+Scaling: 0.05 hour/bit, Offset: 0 hr, Data range: 0 to 210554060.75 hour
+Page 51
+● Scaling: 0.125 rpm/bit, Offset: 0 rpm, Data range: 0 to 8031.875 rpm
+      
+Application and Installation Guide
+EMCP 4 SCADA Data Links
+   Parameter Name
+   Automatic Start/Stop State
+     Data Interpretation
+   0 = INIT
+1 = PRE_CRANK
+2 = STARTING
+3 = RUNNING
+4 = PRE_COOLDOWN 5 = COOLDOWN
+6 = STOPPING
+7 = STOPPED
+8 = IDLING
+   R/W
+R 206
+R 207 R 208
+R 209 R 210 R 212 R 213 R 215 R 217 R 219 R 221 R 222 R 223 R 224 R 225 R 226 R 227 R 228 R 229 R 230 R 231 R 232 R 233 R 234
+Ct Sec 4.2 4.3 4.4 Lvl
+Holding Register
+        Spare Analog Input Percent Spare Analog Input Temperature
+Spare Analog Input Pressure
+Service Maintenance Interval Hours Remaining
+Service Maintenance Interval Days Remaining
+Number of Crank Attempts Number of Successful Starts
+Engine Oil Pressure from Data Link
+Engine Coolant Temperature from Data Link
+Cylinder #1 Exhaust Port Temperature from Data Link
+Cylinder #2 Exhaust Port Temperature from Data Link
+Cylinder #3 Exhaust Port Temperature from Data Link
+Cylinder #4 Exhaust Port Temperature from Data Link
+Cylinder #5 Exhaust Port Temperature from Data Link
+Cylinder #6 Exhaust Port Temperature from Data Link
+Cylinder #7 Exhaust Port Temperature from Data Link
+Cylinder #8 Exhaust Port Temperature from Data Link
+Cylinder #9 Exhaust Port Temperature from Data Link
+Cylinder #10 Exhaust Port Temperature from Data Link
+Cylinder #11 Exhaust Port Temperature from Data Link
+Cylinder #12 Exhaust Port Temperature from Data Link
+Cylinder #13 Exhaust Port Temperature from Data Link
+Cylinder #14 Exhaust Port Temperature from Data Link
+©2010 Caterpillar All rights reserved.
+1
+0x00CE 1 0x00CF 1
+0x00D0 1 0x00D1 1 0x00D3 1 0x00D4 2 0x00D6 2 0x00D8 1 0x00DA 1 0x00DC 1 0x00DD 1 0x00DE 1 0x00DF 1 0x00E0 1 0x00E1 1 0x00E2 1 0x00E3 1 0x00E4 1 0x00E5 1 0x00E6 1 0x00E7 1 0x00E8 1 0x00E9 1
+0 ● ● ●
+0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ●
+n/a always 0xFFFF
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.125 kPa/bit, Offset: 0 kPa, Data range: 0 to 8031.875 kPa
+Scaling: 1 hr/bit, Offset: -32127 hr, Data range: -32127 to 32128 hr
+Scaling: 1 day/bit, Offset: -32127 days, Data range: -32127 to 32128 days
+Scaling: 1 /bit, Offset: 0, Data range: 0 to 4,211,081,215
+Scaling: 1 /bit, Offset: 0, Data range: 0 to 4,211,081,215
+Scaling: 0.125 kPa/bit, Offset: 0 kPa, Data range: 0 to 8031.875 kPa
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Page 52
+0x00CD
+                                                                      
+Application and Installation Guide
+EMCP 4 SCADA Data Links
+         Parameter Name
+Cylinder #15 Exhaust Port Temperature from Data Link
+Cylinder #16 Exhaust Port Temperature from Data Link
+Cylinder #17 Exhaust Port Temperature from Data Link
+Cylinder #18 Exhaust Port Temperature from Data Link
+Cylinder #19 Exhaust Port Temperature from Data Link
+Cylinder #20 Exhaust Port Temperature from Data Link
+Exhaust Manifold #1 (Left) Temperature from Data Link
+Exhaust Manifold #2 (Right) Temperature from Data Link
+Intake Manifold #1 Temperature from Data Link
+Intake Manifold #2 Temperature from Data Link
+Engine Oil Temperature from Data Link Engine Fuel Temperature from Data Link Fuel Pressure from Data Link
+Crankcase Pressure from Data Link Boost Pressure from Data Link
+Oil Filter Differential Pressure from Data Link
+Fuel Filter Differential Pressure from Data Link
+Air Filter 1 Differential Pressure from Data Link
+Instantaneous Fuel Consumption from Data Link
+Atmospheric Pressure from Data Link
+Fuel Level
+Service Maintenance Interval Weeks Remaining
+Bypass Cooldown
+Engine Control Switch Position
+Engine Control Switch Command Lamp Test Command
+©2010 Caterpillar All rights reserved.
+0x00EA 1 0x00EB 1 0x00EC 1 0x00ED 1 0x00EE 1 0x00EF 1 0x00F0 1 0x00F1 1 0x00F2 1 0x00F3 1 0x00F4 1 0x00F5 1 0x00F6 1 0x00F7 1 0x00F8 1 0x00FA 1 0x00FB 1 0x00FC 1 0x00FF 1 0x0100 1 0x0101 1 0x012A 1 0x012B 1
+0x012C 1
+0x012D 1 0x012E 1
+0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ● 0 ● ● ●
+0 ● ● ● 0 ● ● ●
+0 ● ● ●
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.125 kPa/bit, Offset: 0 kPa, Data range: 0 to 8031.875 kPa
+Scaling: 1/128 kPa/bit, Offset: -250 kPa, Data range: -250 to 251.99 kPa
+Scaling: 0.125 kPa/bit, Offset: 0 kPa, Data range: 0 to 8031.875 kPa
+Scaling: 0.5 kPa/bit, Offset: 0 kPa, Data range: 0 to 125 kPa
+Scaling: 0.125 kPa/bit, Offset: 0 kPa, Data range: 0 to 8031.875 kPa
+Scaling: 1/128 kPa/bit, Offset: -250 kPa, Data range: -250 to 251.99 kPa
+Scaling: 0.05 L/h per bit, Offset: 0 L/h, Data range: 0 to 3212.75 L/h
+Scaling: 0.125 kPa/bit, Offset: 0 kPa, Data range: 0 to 8031.875 kPa
+Scaling: 0.0078125 %/bit, Offset: -251 %, Data range: -251 to 250.99 %
+Scaling: 1 week/bit, Offset: -125 weeks, Data range: -125 to 125 weeks
+R/W
+R 235 R 236 R 237 R 238 R 239 R 240 R 241 R 242 R 243 R 244 R 245 R 246 R 247 R 248 R 249 R 251 R 252 R 253 R 256 R 257 R 258 R 299 W 300
+R 301
+W 302 W 303
+Ct Sec 4.2 4.3 4.4 Lvl
+Holding Register
+Data Interpretation
+                                                                     0 = FALSE 1 = TRUE
+0 = STOP 1=AUTO 2 = RUN
+0 = STOP 1=AUTO 2 = RUN
+0 = FALSE 1 = TRUE
+            Page 53
+
+Application and Installation Guide
+EMCP 4 SCADA Data Links
+         Parameter Name
+Acknowledge All Events Command Auto Start/Stop Fuel Control Enabled Key Press
+W 304 R 307 W 310
+R 319
+0x012F 1 0 0x0132 1 0 0x0135 1
+1 0
+● ● ● ● ● ●
+● ● ●
+0 = FALSE 1 = TRUE
+0 = FALSE 1 = TRUE
+0 = FALSE 1 = TRUE
+R/W Ct Sec 4.2 4.3 4.4 Lvl
+Holding Register
+Data Interpretation
+            SCR System Check Required Status
+   Fuel Unload Pump Active
+   Fuel Load Pump Active
+    0x013E
+   0x0140
+   0x0141
+    0 = FALSE
+1 = TRUE
+2 = ERROR
+3 = DISABLED OR NOT AVAILABLE
+   0 = FALSE
+1 = TRUE
+2 = ERROR
+3 = DISABLED OR NOT AVAILABLE
+   0 = FALSE
+1 = TRUE
+2 = ERROR
+3 = DISABLED OR NOT AVAILABLE
+           R321 10●●
+     System Event Count
+System Event Lamp Status
+Forced Idle Command Active
+Generator Excitation Field Voltage from Data Link
+Generator Excitation Field Current from Data Link
+Alarm Group 1 Column 1 Alarm Group 1 Column 2 Alarm Group 1 Horn Alarm Group 2 Column 1 Alarm Group 2 Column 2 Alarm Group 2 Horn
+R 322
+R 334
+R 335
+R 337 R 338
+R 340 R 342 R 343 R 344 R 346 R 347 R 348
+1 0 ● ● ●
+0x014D 1 0 ● ● ●
+0x014E 1 0 ● ● ●
+0x0150 1 0 ● ● ● 0x0151 1 0 ● ● ●
+0x0153 1 0 ● ● ● 0x0155 1 0 ● ● ● 0x0156 1 0 ● ● ● 0x0157 1 0 ● ● ● 0x0159 1 0 ● ● ● 0x015A 1 0 ● ● ● 0x015B 1 0 ● ● ●
+Scaling: 1 /bit, Offset: 0, Data range: 0 to 255 events
+0 = no lamp active
+1 = Red lamp active
+4 = Amber lamp active
+5 = Amber and Red lamp active
+0 = FALSE 1 = TRUE
+Scaling: 0.05 V/bit, Offset: -1606.0, Data range: -1606.0 to 1606.75 V
+Scaling: 0.05 A/bit, Offset: 0 A, Data range: 0 to 3212.75 A
+               For all of these registers: BIT15=ROW16
+BIT 14 = ROW 15 BIT13=ROW14
+BIT 12 = ROW 13 BIT 11 = ROW 12 BIT10=ROW11 BIT 9 = ROW 10 BIT 8 = ROW 9 BIT7=ROW8 BIT 6 = ROW 7 BIT 5 = ROW 6 BIT4=ROW5 BIT 3 = ROW 4 BIT 2 = ROW 3 BIT1=ROW2 BIT 0 = ROW 1
+             ©2010 Caterpillar All rights reserved.
+Page 54
+
+Application and Installation Guide
+EMCP 4 SCADA Data Links
+   Parameter Name
+   Alarm Group 3 Column 1
+   Alarm Group 3 Column 2
+     Data Interpretation
+   BIT 15 = Aftertreatment Shutdown Event Active
+BIT 14 = not used
+BIT 13 = not used
+BIT 12 = not used
+BIT 11 = not used
+BIT 10 = not used
+BIT 9 = High Battery Voltage Shutdown Event Active
+BIT 8 = not used
+BIT 7 = Low Fuel Level Shutdown or Low Gas Pressure Shutdown Event Active
+BIT 6 = Low Coolant Level Shutdown Event Active
+BIT 5 = Overspeed Shutdown Event Active
+BIT 4 = Low Oil Pressure Shutdown Event Active
+BIT 3 = not used
+BIT 2 = High Coolant Temperature Shutdown Event Active
+BIT 1 = Engine Failure to Start (Overcrank) Shutdown Event Active
+BIT 0 = Emergency Stop Shutdown Event Active
+   BIT 15 = Aftertreatment Warning Event Active
+BIT 14 = Engine Running Condition Active BIT 13 = Emergency Power System Supplying Load Condition Active
+BIT 12 = Battery Charger AC Failure Event Active
+BIT 11 = Low Cranking Voltage Warning Event Active
+BIT 10 = Low Battery Voltage Warning Event Active
+BIT 9 = High Battery Voltage Warning Event Active
+BIT 8 = Engine Control Switch Not in Automatic Event Active
+BIT 7 = Low Fuel Level Warning or Low Gas Pressure Warning Event Active
+BIT 6 = Low Coolant Level Warning Event Active
+BIT 5 = not used
+BIT 4 = Low Oil Pressure Warning Event Active
+BIT 3 = Low Coolant Temperature Warning Event Active
+BIT 2 = High Coolant Temperature Warning Event Active
+BIT 1 = not used
+BIT 0 = Emergency Stop Diagnostic Event Active
+   R/W
+Ct Sec 4.2 4.3 4.4 Lvl
+       ©2010 Caterpillar All rights reserved.
+Page 55
+R 350
+1 0 ● ● ●
+     R 351
+1 0 ● ● ●
+Holding Register
+ 0x015D
+   0x015E
+ 
+Application and Installation Guide
+EMCP 4 SCADA Data Links
+   Parameter Name
+   Alarm Group 3 Horn
+   Alarm Group 4 Column 1
+    Holding Register
+   0x015F
+   0x0161
+    Data Interpretation
+   BIT 15 = Aftertreatment Event Horn Active BIT 14 = Engine Running Condition Horn Active
+BIT 13 = Emergency Power System Supplying Load Condition Horn Active
+BIT 12 = Battery Charger AC Failure Event Horn Active
+BIT 11 = Low Cranking Voltage Event Horn Active
+BIT 10 = Low Battery Voltage Event Horn Active
+BIT 9 = High Battery Voltage Event Horn Active
+BIT 8 = Engine Control Switch Not in Automatic Event Horn Active
+BIT 7 = Low Fuel Level or Low Gas Pressure Event Horn Active
+BIT 6 = Low Coolant Level Event Horn Active
+BIT 5 = Overspeed Shutdown Event Horn Active
+BIT 4 = Low Oil Pressure Event Horn Active
+BIT 3 = Low Coolant Temperature Event Horn Active
+BIT 2 = High Coolant Temperature Event Horn Active
+BIT 1 = Engine Failure to Start (Overcrank) Shutdown Event Horn Active BIT 0 = Emergency Stop Shutdown / Diagnostic Horn Active
+   BIT 15 = Aftertreatment Shutdown Event Active
+BIT 14 = Air Shutdown Damper Closed Event Active
+BIT 13 = not used
+BIT 12 = not used
+BIT 11 = not used
+BIT 10 = not used
+BIT 9 = High Battery Voltage Shutdown Event Active
+BIT 8 = not used
+BIT 7 = Low Fuel Level Shutdown Event Active
+BIT 6 = Low Coolant Level Shutdown Event Active
+BIT 5 = Overspeed Shutdown Event Active
+BIT 4 = Low Oil Pressure Shutdown Event Active
+BIT 3 = not used
+BIT 2 = High Coolant Temperature Shutdown Event Active
+BIT 1 = Engine Failure to Start (Overcrank) Shutdown Event Active
+BIT 0 = Emergency Stop Shutdown Event Active
+ R/W
+Ct Sec 4.2 4.3 4.4 Lvl
+     R 352
+1 0 ● ● ●
+     ©2010 Caterpillar All rights reserved.
+Page 56
+R 354
+1 0 ● ● ●
+
+Application and Installation Guide
+EMCP 4 SCADA Data Links
+   Parameter Name
+   Alarm Group 4 Column 2
+   Alarm Group 4 Horn
+    Holding Register
+   0x0162
+   0x0163
+    Data Interpretation
+   BIT 15 = Aftertreatment Warning Event Active
+BIT 14 = not used
+BIT 13 = Emergency Power System Supplying Load Condition Active
+BIT 12 = Battery Charger AC Failure Event Active
+BIT 11 = Low Cranking Voltage Warning Event Active
+BIT 10 = Low Battery Voltage Warning Event Active
+BIT 9 = High Battery Voltage Warning Event Active
+BIT 8 = Engine Control Switch Not in Automatic Event Active
+BIT 7 = Low Fuel Level Warning Event Active
+BIT 6 = Low Coolant Level Warning Event Active
+BIT 5 = not used
+BIT 4 = Low Oil Pressure Warning Event Active
+BIT 3 = Low Coolant Temperature Warning Event Active
+BIT 2 = High Coolant Temperature Warning Event Active
+BIT 1 = not used
+BIT 0 = Emergency Stop Diagnostic Event Active
+   BIT 15 = Aftertreatment Event Horn Active BIT 14 = Air Shutdown Damper Closed Event Horn Active
+BIT 13 = Emergency Power System Supplying Load Condition Horn Active
+BIT 12 = Battery Charger AC Failure Event Horn Active
+BIT 11 = Low Cranking Voltage Event Horn Active
+BIT 10 = Low Battery Voltage Event Horn Active
+BIT 9 = High Battery Voltage Event Horn Active
+BIT 8 = Engine Control Switch Not in Automatic Event Horn Active
+BIT 7 = Low Fuel Level Event Horn Active BIT 6 = Low Coolant Level Event Horn Active
+BIT 5 = Overspeed Shutdown Event Horn Active
+BIT 4 = Low Oil Pressure Event Horn Active
+BIT 3 = Low Coolant Temperature Event Horn Active
+BIT 2 = High Coolant Temperature Event Horn Active
+BIT 1 = Engine Failure to Start (Overcrank) Shutdown Event Horn Active BIT 0 = Emergency Stop Shutdown / Diagnostic Horn Active
+ R/W
+Ct Sec 4.2 4.3 4.4 Lvl
+     R 355
+1 0 ● ● ●
+     Urea Tank Level
+Aftertreatment #1 SCR Catalyst Reagent Tank #1 Temperature
+©2010 Caterpillar All rights reserved.
+R 377 R 378
+0x0178 0x0179
+1 0 1 0
+● ● ● ● ● ●
+Scaling: 0.4 %/bit, Offset: 0%, Data range: 0 to 100%
+Scaling: 1 C/bit, Offset: -40 C, Data range: -40 to 210 C
+Page 57
+R 356
+1 0 ● ● ●
+      
+Application and Installation Guide
+EMCP 4 SCADA Data Links
+         Parameter Name
+Urea Injection Air Pressure Catalyst Intake Temperature
+Aftertreatment 1 SCR Catalyst Exhaust Gas Differential Pressure
+Digital Input #1 Active Status
+Digital Input #2 Active Status
+Digital Input #3 Active Status
+Digital Input #4 Active Status
+Digital Input #5 Active Status
+Digital Input #6 Active Status
+Digital Input #7 Active Status
+Digital Input #8 Active Status
+Isolated Digital Input #1 Active Status
+Isolated Digital Input #2 Active Status
+Isolated Digital Input #3 Active Status
+Isolated Digital Input #4 Active Status
+Dedicated Digital Input #1 (E-Stop) Active Status
+Dedicated Digital Input #2 (Initiate Command) Active Status
+Dedicated Digital Input #3 (Gen CB Aux A) Active Status
+Dedicated Digital Input #4 (Gen CB Aux B) Active Status
+R 379 R 381
+R 382
+R 600 R 601 R 602 R 603 R 604 R 605 R 606 R 607 R 608 R 609 R 610 R 611
+R 612
+R 613
+R 614
+R 615
+R 616 R 617 R 618 R 619 R 620 R 621 R 622 R 623 R 624 R 625 R 626 R 627 R 628 R 629 R 630 R 631 R 632 R 633
+● ● ●
+● ● ●
+● ● ●
+● ● ●
+● ● ●
+● ● ●
+● ● ●
+● ● ●
+● ● ●
+● ● ●
+● ● ●
+● ● ●
+● ● ●
+● ● ●
+● ● ●
+● ● ●
+● ● ● ● ●
+0x0268 1 0 ● 0x0269 1 0 ● 0x026A 1 0 ● 0x026B 1 0 ● 0x026C 1 0 ● 0x026D 1 0 ● 0x026E 1 0 ● 0x026F 1 0 ● 0x0270 1 0 ● 0x0271 1 0 ● 0x0272 1 0 ● 0x0273 1 0 ● 0x0274 1 0 ● 0x0275 1 0 ● 0x0276 1 0 ● 0x0277 1 0 ● 0x0278 1 0 ●
+Scaling: 8 kPa/bit, Offset: 0 kPa, Data range: 0 to 2000 kPa
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.1 kPa/bit, Offset: 0 kPa, Data range: 0 to 6425.5 kPa
+For all of these inputs: 0 = INACTIVE
+1 = ACTIVE
+3 = DISABLED
+For all of these dedicated inputs: 0 = INACTIVE
+1 = ACTIVE
+R/W Ct Sec 4.2 4.3 4.4 Lvl
+Holding Register
+0x017A 1 0 0x017C 1 0
+0x017D 1 0
+0x0257 1 0 0x0258 1 0 0x0259 1 0 0x025A 1 0 0x025B 1 0 0x025C 1 0 0x025D 1 0 0x025E 1 0 0x025F 1 0 0x0260 1 0 0x0261 1 0 0x0262 1 0
+0x0263 1 0
+0x0264 1 0
+0x0265 1 0
+Data Interpretation
+                                              Relay Output #1
+Relay Output #2
+Relay Output #3
+Relay Output #4
+Relay Output #5
+Relay Output #6
+Relay Output #7
+Relay Output #8
+Digital Output #1 Active Status Digital Output #2 Active Status Digital Output #3 Active Status Digital Output #4 Active Status Digital Output #5 Active Status Digital Output #6 Active Status Digital Output #7 Active Status Digital Output #8 Active Status Digital Output #9 Active Status Digital Output #10 Active Status
+©2010 Caterpillar All rights reserved.
+0x0266 1 0 0x0267 1 0 ●
+Active Status Active Status Active Status Active Status Active Status Active Status Active Status Active Status
+              For all of these relay and digital outputs: 0 = INACTIVE
+1 = ACTIVE
+3 = DISABLED
+                       Page 58
+
+Application and Installation Guide
+EMCP 4 SCADA Data Links
+         Parameter Name
+Digital Output #11 Active Status
+Digital Output #12 Active Status
+Digital Output #13 Active Status
+Digital Output #14 Active Status
+Digital Output #15 Active Status
+Digital Output #16 Active Status
+Digital Output #17 Active Status
+Group Start Active Status (DIDI-01)
+Bell Alarm Active Status (DIDI-02)
+Gen CB Trip Command Active Status (DIDI-03)
+Gen CB Close Command Active Status (DIDI-04)
+Arbitration Relay Active Status (DDO-01) Gen CB Close Active Status (DDO-02) Gen CB Trip Active Status (DDO-03)
+Analog Input #1 Sensor Value Analog Input #2 Sensor Value Analog Input #3 Sensor Value Analog Input #4 Sensor Value
+Analog Input #1 Data Value
+Analog Input #2 Data Value
+Analog Input #3 Data Value
+Analog Input #4 Data Value
+Analog Output #1 Data Value
+Analog Output #2 Data Value
+Analog Output #3 Data Value
+PWM Output #1 Data Value PWM Output #2 Data Value
+©2010 Caterpillar All rights reserved.
+R 634 R 635 R 636 R 637 R 638 R 639 R 640 R 641 R 642
+R 643
+R 644
+R 645 R 646 R 647
+R 648 R 649 R 650 R 651
+R 652
+R 654
+R 656
+R 658
+R 660
+R 662
+R 664
+R 672 R 674
+0x0279 1 0 0x027A 1 0 0x027B 1 0 0x027C 1 0 0x027D 1 0 0x027E 1 0 0x027F 1 0 0x0280 1 0 0x0281 1 0
+0x0282 1 0
+0x0283 1 0
+0x0284 1 0 0x0285 1 0 0x0286 1 0
+0x0287 1 0 0x0288 1 0 0x0289 1 0 0x028A 1 0
+0x028B 2 0
+0x028D 2 0
+0x028F 2 0
+0x0291 2 0
+0x0293 2 0
+0x0295 2 0
+0x0297 2 0
+0x029F 2 0 0x02A1 2 0
+● ● ● ● ● ● ●
+R/W Ct Sec 4.2 4.3 4.4 Lvl
+Holding Register
+Data Interpretation
+                  ● ●
+●
+●
+●
+● Scaling: 1/16 /bit, Offset: -16, Data range:
+-16 to 3999.9375
+● Scaling: 1/16 /bit, Offset: -16, Data range: -16 to 3999.9375
+● Scaling: 1/16 /bit, Offset: -16, Data range: -16 to 3999.9375
+● Scaling: 1/16 /bit, Offset: -16, Data range: -16 to 3999.9375
+Scaling: 1/256 /bit, Offset: -8,224,768, ● Data range: -8,224,768 to
+8,224,767.99609375
+Scaling: 1/256 /bit, Offset: -8,224,768, ● Data range: -8,224,768 to
+8,224,767.99609375
+Scaling: 1/256 /bit, Offset: -8,224,768,
+● Data range: -8,224,768 to 8,224,767.99609375
+Scaling: 1/256 /bit, Offset: -8,224,768, ● Data range: -8,224,768 to
+8,224,767.99609375
+Scaling: 1/256 /bit, Offset: -8,224,768, Data range: -8,224,768 to 8,224,767.99609375
+Scaling: 1/256 /bit, Offset: -8,224,768, Data range: -8,224,768 to 8,224,767.99609375
+Scaling: 1/256 /bit, Offset: -8,224,768, Data range: -8,224,768 to 8,224,767.99609375
+Scaling: 1/16 %/bit, Offset: -16, Data range: -16 to 3999.9375 %
+Scaling: 1/16 %/bit, Offset: -16, Data range: -16 to 3999.9375 %
+Page 59
+    ●
+● 0 = INACTIVE
+For all of these statuses: 1 = ACTIVE
+           ● ● ● ● ● ●
+● ●
+● ●
+● ●
+                        ● ●
+● ●
+● ●
+● ●
+● ●
+               
+Application and Installation Guide
+EMCP 4 SCADA Data Links
+         Parameter Name
+Analog Output #1 Data Command
+Analog Output #2 Data Command
+Analog Output #3 Data Command
+PWM Output #1 Data Command
+PWM Output #2 Data Command
+Write Access Password Level 1 Password
+Level 2 Password SCADA Password
+Current Security Level Set Security Level
+Level 3 Password Phone In Prompt
+Engine Oil Temperature from I/O Pin Exhaust Temperature
+Left Manifold Exhaust Temperature
+Right Manifold Exhaust Temperature from I/O Pin
+Fuel Level from I/O Pin
+External Tank Fuel Level from I/O Pin
+Engine Oil Level from I/O Pin
+Engine Coolant Level from I/O Pin
+Oil Filter Differential Pressure from I/O Pin
+Air Filter 1 Differential Pressure from I/O Pin
+Fuel Filter Differential Pressure from I/O Pin
+Main Tank Urea Level from I/O Pin Real Time Clock
+Update Real Time Clock Command
+©2010 Caterpillar All rights reserved.
+0x02A8 2 0
+0x02AA 2 0
+0x02AC 2 0
+0x02AE 2 0
+0x02B0 2 0 0x02BB 8 none ●
+0x02C3 8 1 ● 0x02CB 8 2 ● 0x02D3 8 2 ●
+0x02DB 1 0 ● 0x02DC 1 0 ●
+0x02DD 8 0 ● 0x031F 1 0 ●
+0x0320 1 0 ●
+0x0321 1 0 ●
+0x0322 1 0 ●
+0x0323 1 0 ●
+0x0324 1 0 ●
+0x0325 1 0 ●
+0x0326 1 0 ●
+0x0328 1 0 ●
+0x0329 1 0 ●
+0x032A 1 0 ●
+0x032B 1 0 ● 0x0383 3 0 ● 0x0386 3 1 ●
+● ●
+● ●
+● ●
+● ●
+● ●
+● ● ● ● ● ● ● ●
+● ● ● ●
+● ●
+● ● ● ●
+● ●
+● ●
+● ●
+● ●
+● ●
+● ●
+● ●
+● ●
+● ●
+● ● ● ● ● ●
+Scaling: 1/256 /bit, Offset: -8,224,768, Data range: -8,224,768 to 8,224,767.99609375
+Scaling: 1/256 /bit, Offset: -8,224,768, Data range: -8,224,768 to 8,224,767.99609375
+Scaling: 1/256 /bit, Offset: -8,224,768, Data range: -8,224,768 to 8,224,767.99609375
+Scaling: 1/256 /bit, Offset: -8,224,768, Data range: -8,224,768 to 8,224,767.99609375
+Scaling: 1/256 /bit, Offset: -8,224,768, Data range: -8,224,768 to 8,224,767.99609375
+For all of these passwords:
+Each byte is comprised of one character via its ASCII code. First NULL (0x00) character terminates string.
+Scaling: 1 /bit, Offset: 0, Data range: 0 to 64255
+Scaling: 1 /bit, Offset: 0, Data range: 0 to 64255
+Each byte is comprised of one character via its ASCII code. First NULL (0x00) character terminates string.
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.0078125 %/bit, Offset: -251 %, Data range: -251 to 250.99 %
+Scaling: 0.0078125 %/bit, Offset: -251 %, Data range: -251 to 250.99 %
+Scaling: 0.0078125 %/bit, Offset: -251 %, Data range: -251 to 250.99 %
+Scaling: 0.0078125 %/bit, Offset: -251 %, Data range: -251 to 250.99 %
+Scaling: 0.125 kPa/bit, Offset: 0 kPa, Data range: 0 to 8031.875 kPa
+Scaling: 1/128 kPa/bit, Offset: -250 kPa, Data range: -250 to 251.99 kPa
+Scaling: 0.125 kPa/bit, Offset: 0 kPa, Data range: 0 to 8031.875 kPa
+Scaling: 0.0078125 %/bit, Offset: -251 %, Data range: -251 to 250.99 %
+R/W
+W 681
+W 683
+W 685
+W 687
+W 689
+W 700 W 708 W 716 W 724
+R 732 W 733
+R 734
+R 800 R 801
+R 802
+R 803
+R 804
+R 805
+R 806
+R 807
+R 809
+R 810
+R 811
+R 812 R 900 W 903
+Ct Sec 4.2 4.3 4.4 Lvl
+Holding Register
+Data Interpretation
+                                                                        see section 5.8 see section 5.8
+      Page 60
+
+Application and Installation Guide
+EMCP 4 SCADA Data Links
+         Parameter Name
+Log Entry Index
+Log Entry Reset Event
+Cooldown Duration Remaining
+Remote Initiate Command
+Emergency Stop Command
+Desired Genset Output Voltage
+Total Voltage Bias Percent
+Voltage Bias Percent Increment Command
+Requested Engine Speed Total Speed Bias Percent
+Speed Bias Percent Increment Command
+Generator/Bus Phase Difference
+Generator Frequency within Limits Generator Voltage within Limits Bus Voltage within Limits
+Bus Live Status
+Genset Control Online
+Engine Control Online
+Secondary Engine Control Online External I/O #1 Online
+External I/O #2 Online
+External I/O #3 Online
+External I/O #4 Online
+Digital AVR Online
+©2010 Caterpillar All rights reserved.
+W 1033
+R 1034 W 1048
+R 1054 W 1055 W 1056 R 1057 R 1058 W 1059 R 1060 R 1061 W 1062
+R 1064
+● ●
+R/W Ct Sec 4.2 4.3 4.4 Lvl
+Holding Register
+0x0408 1 0 ● 0x0409 14 0 ●
+0x0417 2 1 ● 0x041D 1 0 ●
+0x041E 1 0 ● 0x041F 1 0 ● 0x0420 1 0 ● 0x0421 1 0 ● 0x0422 1 0 ● 0x0423 1 0 ● 0x0424 1 0 ● 0x0425 1 0 ●
+0x0427 1 0
+Scaling: 1 /bit, Offset: 0, Data range: 0 to 39
+● ● see section 5.7
+● ● see section 5.7
+Data Interpretation
+            ● ●
+● ● 0 = FALSE
+Scaling: 1 second/bit, Offset: 0 seconds, Data range: 0 to 64255 seconds
+   1 = TRUE
+● ● 0 = FALSE 1 = TRUE
+● ● Scaling: 1 V/bit, Offset: 0 V, Data range: 0 to 64255 V
+         Scaling: 0.0078125 %/bit, Offset: -251 %, Data range: -251 to 250.99 %
+● ●
+● ● Scaling: 0.0078125 %/bit, Offset: -251 %,
+   Data range: -251 to 250.99 %
+● ● Scaling: 0.125 rpm/bit, Offset: 0 rpm, Data range: 0 to 8031.875 rpm
+      ● ● ● ●
+Scaling: 0.0078125 %/bit, Offset: -251 %, Data range: -251 to 250.99 %
+Scaling: 0.0078125 %/bit, Offset: -251 %, Data range: -251 to 250.99 %
+               Generator Circuit Breaker Status
+R1065 10 ●
+R 1067 R 1068 R 1069 R 1070 R 1090 R 1091 R 1092 R 1093 R 1094 R 1095 R 1096 R 1097
+0x042A 1 0 ● 0x042B 1 0 ● 0x042C 1 0 0x042D 1 0 0x0441 1 0 ● 0x0442 1 0 ● 0x0443 1 0 ● 0x0444 1 0 ● 0x0445 1 0 ● 0x0446 1 0 ● 0x0447 1 0 ● 0x0448 1 0 ●
+● ● 0 = FALSE 1 = TRUE
+● ● 0 = FALSE 1 = TRUE
+● 0 = FALSE 1 = TRUE
+● 0 = FALSE 1 = TRUE
+● ● 0 = FALSE 1 = TRUE
+● ● 0 = FALSE 1 = TRUE
+● ● 0 = FALSE 1 = TRUE
+● ● 0 = FALSE 1 = TRUE
+● ● 0 = FALSE 1 = TRUE
+● ● 0 = FALSE 1 = TRUE
+● ● 0 = FALSE 1 = TRUE
+● ● 0 = FALSE 1 = TRUE
+0x0428
+Scaling: 1/128 degree/bit, Offset: -200 ● degrees, Data range: -200 to 301.99
+degrees
+     0 = OPEN
+1 = CLOSED
+2 = LOCKED OUT 7 = ERROR
+                                       Page 61
+
+Application and Installation Guide
+EMCP 4 SCADA Data Links
+         RTD Module Online Thermocouple #1 Online Thermocouple #2 Online SCR Module Online
+R 1098 R 1099 R 1100 R 1103
+0x0449 1 0x044A 1 0x044B 1 0x044E 1
+0 ● 0 ● 0 ● 0 ●
+● ● ● ● ● ● ● ●
+0 = FALSE 1 = TRUE
+0 = FALSE 1 = TRUE
+0 = FALSE 1 = TRUE
+0 = FALSE 1 = TRUE
+Parameter Name
+R/W Ct Sec 4.2 4.3 4.4 Lvl
+Holding Register
+Data Interpretation
+               Sync Mode Switch State
+   Dead Bus Arbitration State
+   Load Sense Load Demand State
+    0x0453
+   0x0456
+   0x045F
+    0 = OFF
+1 = AUTOMATIC 2 = MANUAL
+3 = CHECK
+   0 = DBA DISABLED 1 = DBA ENABLED 2 = REQUESTING 3 = CAPTURING
+4 = ARB CHECK
+5 = CLOSE GRANTED 6 = GEN ONLINE
+7 = DBA FAILURE #1 8 = DBA FAILURE #2 9 = DBA FAILURE #3 10 = FAILURE WAIT 11 = MAX FAILURES 12 = LIVE BUS
+13 = BRKR CLOSED 14 = LINE FAULT #1 15 = LINE FAULT #2 16 = LINE FAULT #3 17 = DBA FAILURE #1 18 = DBA FAILURE #2 19 = DBA FAILURE #3 20 = DBA FAILURE #4
+   0 = LSLD OFF
+1 = LSLD WAIR
+2 = ANALYZING KW
+3 = ARBITRATION
+4 = RAMP UP
+5 = LAST UNIT CHECK 6 = RAMP DOWN
+7 = LSLD STANDBY
+      R1108 10 ●
+R1111 10 ●
+          Load Shed Command Active Status
+Load Shed Command Reset Primary Data Link Status Accessory Data Link Status RS-485 SCADA Data Link Status
+TCP/IP SCADA Data Link Status RS-485 Annunciator Data Link Status
+©2010 Caterpillar All rights reserved.
+R 1129
+W 1130 R 1140 R 1141 R 1142
+R 1143 R 1144
+0x0468 1 0 0x0469 1 0
+0x0473 1 0 ● 0x0474 1 0 ● 0x0475 1 0 ●
+0x0476 1 0 0x0477 1 0 ●
+● ●
+● ● ● ● ● ● ● ●
+● ● ● ●
+0 = INACTIVE 1 = ACTIVE
+3 = DISABLED
+0 = FALSE 1 = TRUE
+0=OK
+1 = FAULT
+0=OK
+1 = FAULT
+0=OK
+1 = FAULT
+0 = OK
+1 = FAULT
+3 = DISABLED OR NOT AVAILABLE
+R1120 10 ●
+                  0=OK
+1 = FAULT
+   Page 62
+
+Application and Installation Guide
+EMCP 4 SCADA Data Links
+   Parameter Name
+   Low Idle State from ADEM
+   Engine Protection has Shut Down Engine
+     Data Interpretation
+   0 = FALSE
+1 = TRUE
+2 = ERROR
+3 = DISABLED OR NOT AVAILABLE
+   0 = FALSE
+1 = TRUE
+2 = ERROR
+3 = DISABLED OR NOT AVAILABLE
+   R/W Ct Sec 4.2 4.3 4.4 Lvl
+Holding Register
+        R 1263
+R 1275
+R 1276
+R 1487 R 1488 R 1489 R 1490 R 1491 R 1492 R 1493
+W 1498
+R 1499
+R 1500 R 1514 R 1528 R 1542 R 1556 R 1570 R 1584 R 1598 R 1612 R 1626 R 1640 R 1654 R 1668 R 1682
+● ●
+● ●
+Each byte is comprised of one character
+● ● via its ASCII code. First NULL (0x00)
+character terminates string.
+0x05CF 1 0 ●
+For each programmable cycle timer output
+● status:
+0 = PCT Output 3 is currently not activated
+● by this timer (but is configured).
+1 = PCT Output 3 is currently activated by
+this timer.
+● 2 = PCT Output 3 is not configured to be
+0x04EE
+1 0 ●
+1 0 ●
+        Control Serial Number
+Programmable Cycle Timer Status
+Programmable Cycle Timer Status
+Programmable Cycle Timer Status
+Programmable Cycle Timer Status
+Programmable Cycle Timer Status
+Programmable Cycle Timer Status
+Programmable Cycle Timer Status
+1 Output 3 2 Output 3 3 Output 3 4 Output 3 5 Output 3 6 Output 3 7 Output 3
+0x04FB 6 0 ●
+0x05CE 1 0 ●
+0x04FA
+        0x05D0 1 0
+0x05D1 1 0
+0x05D2 1 0
+0x05D3 1 0 ● 0x05D4 1 0 ●
+activated by this timer.
+           Event Log Module Selection
+   Event Log Module Selection
+    0x05D9
+   0x05DA
+         For each module selection:
+0 = GENSET CONTROL
+1 = ENGINE CONTROL
+2 = SECONDARY ENGINE CONTROL 3 = EXTERNAL I/O #1
+4 = EXTERNAL I/O #2 5 = EXTERNAL I/O #3 6 = EXTERNAL I/O #4 7 = DIGITAL AVR
+8 = RTD MODULE
+9 = THERMOCOUPLE MODULE #1 10 = THERMOCOUPLE MODULE #2
+        Module Event Log Entry Module Event Log Entry Module Event Log Entry Module Event Log Entry Module Event Log Entry Module Event Log Entry Module Event Log Entry Module Event Log Entry Module Event Log Entry Module Event Log Entry Module Event Log Entry Module Event Log Entry Module Event Log Entry Module Event Log Entry
+©2010 Caterpillar All rights reserved.
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+1 0 ●
+1 0 ●
+0x05DB 14 0 ● 0x05E9 14 0 ● 0x05F7 14 0 ● 0x0605 14 0 ● 0x0613 14 0 ● 0x0621 14 0 ● 0x062F 14 0 ● 0x063D 14 0 ● 0x064B 14 0 ● 0x0659 14 0 ● 0x0667 14 0 ● 0x0675 14 0 ● 0x0683 14 0 ● 0x0691 14 0 ●
+● ●
+● ●
+● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ●
+see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7
+                                          Page 63
+
+Application and Installation Guide
+EMCP 4 SCADA Data Links
+         Parameter Name
+Module Event Log Entry 15
+Module Event Log Entry 16
+Module Event Log Entry 17
+Module Event Log Entry 18
+Module Event Log Entry 19
+Module Event Log Entry 20
+Module Event Log Entry 21
+Module Event Log Entry 22
+Module Event Log Entry 23
+Module Event Log Entry 24
+Module Event Log Entry 25
+Module Event Log Entry 26
+Module Event Log Entry 27
+Module Event Log Entry 28
+Module Event Log Entry 29
+Module Event Log Entry 30
+Module Event Log Entry 31
+Module Event Log Entry 32
+Module Event Log Entry 33
+Module Event Log Entry 34
+Module Event Log Entry 35
+Module Event Log Entry 36
+Module Event Log Entry 37
+Module Event Log Entry 38
+Module Event Log Entry 39
+Module Event Log Entry 40
+Programmable Cycle Timer Status
+Programmable Cycle Timer Status
+Programmable Cycle Timer Status
+Programmable Cycle Timer Status
+Programmable Cycle Timer Status
+Programmable Cycle Timer Status
+Programmable Cycle Timer Status
+Programmable Cycle Timer Status
+Programmable Cycle Timer Status
+Programmable Cycle Timer Status
+©2010 Caterpillar All rights reserved.
+1 Output 1 2 Output 1 3 Output 1 4 Output 1 5 Output 1 6 Output 1 7 Output 1 1 Output 2 2 Output 2 3 Output 2
+R 1696 R 1710 R 1724 R 1738 R 1752 R 1766 R 1780 R 1794 R 1808 R 1822 R 1836 R 1850 R 1864 R 1878 R 1892 R 1906 R 1920 R 1934 R 1948 R 1962 R 1976 R 1990 R 2004 R 2018 R 2032 R 2046
+R 2060 R 2061 R 2062 R 2063 R 2064 R 2065 R 2066 R 2067 R 2068 R 2069
+0x069F 14 0 0x06AD 14 0 0x06BB 14 0 0x06C9 14 0 0x06D7 14 0 0x06E5 14 0 0x06F3 14 0 0x0701 14 0 0x070F 14 0 0x071D 14 0 0x072B 14 0 0x0739 14 0 0x0747 14 0 0x0755 14 0 0x0763 14 0 0x0771 14 0 0x077F 14 0 0x078D 14 0 0x079B 14 0 0x07A9 14 0 0x07B7 14 0 0x07C5 14 0 0x07D3 14 0 0x07E1 14 0 0x07EF 14 0 0x07FD 14 0
+0x080B 1 0 0x080C 1 0 0x080D 1 0 0x080E 1 0 0x080F 1 0 0x0810 1 0 0x0811 1 0 0x0812 1 0 0x0813 1 0 0x0814 1 0
+● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ●
+● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ● ●
+see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7 see section 5.7
+For each programmable cycle timer output status:
+0 = PCT Output 1 is currently not activated by this timer (but is configured).
+1 = PCT Output 1 is currently activated by this timer.
+2 = PCT Output 1 is not configured to be activated by this timer.
+For each programmable cycle timer output status:
+0 = PCT Output 2 is currently not activated by this timer (but is configured).
+1 = PCT Output 2 is currently activated by this timer.
+2 = PCT Output 2 is not configured to be
+Page 64
+R/W Ct Sec 4.2 4.3 4.4 Lvl
+Holding Register
+Data Interpretation
+                                                                                                       
+Application and Installation Guide
+EMCP 4 SCADA Data Links
+         Parameter Name
+Programmable Cycle Timer 4 Output 2 Status
+Programmable Cycle Timer 5 Output 2 Status
+Programmable Cycle Timer 6 Output 2 Status
+Programmable Cycle Timer 7 Output 2 Status
+R/W
+R 2070 R 2071 R 2072 R 2073 R 2074
+R 2075 R 2076 R 2077 R 2078 R 2079 R 2080 R 2081 R 2082 R 2083 R 2084 R 2085 R 2086
+R 2087
+R 2091
+R 2188
+W 2232 W 2233 W 2234 W 2235 W 2236 W 2237 W 2238
+Ct Sec 4.2 4.3 4.4 Lvl
+0x0815 1 0 ● ● ●
+0x0816 1 0 ● ● ●
+0x0817 1 0 ● ● ●
+0x0818 1 0 ● ● ●
+activated by this timer.
+Holding Register
+Data Interpretation
+            Turbocharger 1 Compressor T emperature
+Turbocharger 2 Compressor T emperature
+Turbocharger 3 Compressor T emperature
+Turbocharger 4 Compressor T emperature
+Turbocharger 1 Turbine Inlet T emperature
+Inlet Inlet
+Inlet Inlet
+0x0819 1 0 ● ● 0x081A 1 0 ● ●
+● Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+● Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+● Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+● Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+● Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+● Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+● Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+● Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+● Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+● Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+● Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+● Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+Scaling: 0.03125 C/bit, Offset: -273 C, Data range: -273 to 1735 C
+               Turbocharger 1 Turbine Outlet T emperature
+Turbocharger 2 Turbine Inlet T emperature
+Turbocharger 2 Turbine Outlet T emperature
+Turbocharger 3 Turbine Inlet T emperature
+Turbocharger 3 Turbine Outlet T emperature
+Turbocharger 4 Turbine Inlet T emperature
+Turbocharger 4 Turbine Outlet T emperature
+Exhaust Temperature from Data Link Fuel Pump Primer Status
+Manual Fuel Priming Duration Remaining
+Software Build Version
+Digital Output #1 Command Digital Output #2 Command Digital Output #3 Command Digital Output #4 Command Digital Output #5 Command Digital Output #6 Command Digital Output #7 Command
+©2010 Caterpillar All rights reserved.
+0x081B 1 0 ● ● 0x081C 1 0 ● ● 0x081D 1 0 ● ● 0x081E 1 0 ● ● 0x081F 1 0 ● ● 0x0820 1 0 ● ● 0x0821 1 0 ● ● 0x0822 1 0 ● ● 0x0823 1 0 ● ● 0x0824 1 0 ● ● 0x0825 1 0 ● ● ●
+                        0x0826 1 0 ● ● 0x082A 1 0 ● ● ●
+0x088B 10 0 ● ● 0x08B7 1 0 ● ● ●
+0x08B8 1 0 ● ● ●
+character terminates string.
+0 = Deactivate Fuel Priming ● 1 = Priming Active
+2 = Priming Inappropriate
+Scaling: 1 second/bit, Offset: 0 seconds, Data range: 0 to 64255 seconds
+      Each byte is comprised of one character ● via its ASCII code. First NULL (0x00)
+       0x08B9 1 0 ● 0x08BA 1 0 ● 0x08BB 1 0 ● 0x08BC 1 0
+0x08BD 1 0
+● For each digital and relay output ● command:
+  0 = DEACTIVATE ● 1 = ACTIVATE
+    ● ● ● ●
+     Page 65
+
+Application and Installation Guide
+EMCP 4 SCADA Data Links
+         Parameter Name
+Digital Output #8 Command Digital Output #9 Command Digital Output #10 Command Digital Output #11 Command Digital Output #12 Command Digital Output #13 Command Digital Output #14 Command Digital Output #15 Command Digital Output #16 Command Digital Output #17 Command Relay Output #1 Command Relay Output #2 Command Relay Output #3 Command Relay Output #4 Command Relay Output #5 Command Relay Output #6 Command Relay Output #7 Command Relay Output #8 Command
+W 2239 W 2240 W 2241 W 2242 W 2243 W 2244 W 2245 W 2246 W 2247 W 2248 W 2252 W 2253 W 2254 W 2255 W 2256 W 2257 W 2258 W 2259
+0x08BE 1 0 0x08BF 1 0 0x08C0 1 0 0x08C1 1 0 0x08C2 1 0 0x08C3 1 0 0x08C4 1 0 0x08C5 1 0 0x08C6 1 0 0x08C7 1 0 0x08CB 1 0 0x08CC 1 0 0x08CD 1 0 0x08CE 1 0 0x08CF 1 0 0x08D0 1 0 0x08D1 1 0 0x08D2 1 0
+● ●
+● ●
+● ●
+● ●
+● ●
+● ●
+● ●
+● ●
+● ●
+● ●
+● ● ● ● ● ● ●
