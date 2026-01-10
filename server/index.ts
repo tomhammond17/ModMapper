@@ -11,9 +11,14 @@ import compression from "compression";
 import helmet from "helmet";
 import cors from "cors";
 import { registerSSERoutes, registerRoutes } from "./routes";
+import { registerAuthRoutes } from "./routes/auth";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { logger, logRequest, createLogger } from "./logger";
+import { createSessionMiddleware } from "./middleware/session";
+import { initializeEmailService } from "./services/email";
+import { getDb } from "./db";
+import { Pool } from "pg";
 
 const log = createLogger("server");
 
@@ -77,6 +82,34 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Accept"],
 }));
 
+// Initialize email service for authentication
+initializeEmailService({
+  host: env.SMTP_HOST,
+  port: env.SMTP_PORT ? parseInt(env.SMTP_PORT, 10) : undefined,
+  user: env.SMTP_USER,
+  pass: env.SMTP_PASS,
+});
+
+// Session management middleware (must come before auth routes)
+// Get database pool if DATABASE_URL is configured
+let pool: Pool | undefined;
+if (env.DATABASE_URL) {
+  try {
+    const db = getDb();
+    // Access the pool from drizzle instance (this is a workaround)
+    // In a real implementation, we'd export the pool from db.ts
+    pool = (db as any)._.session?.client?.pool;
+  } catch (error) {
+    log.warn("Failed to get database pool for sessions", { error });
+  }
+}
+
+app.use(createSessionMiddleware({
+  sessionSecret: env.SESSION_SECRET,
+  nodeEnv: env.NODE_ENV,
+  pool,
+}));
+
 const httpServer = createServer(app);
 
 declare module "http" {
@@ -129,6 +162,12 @@ app.use(express.urlencoded({ extended: false }));
     threshold: 1024,
     level: 6,
   }));
+
+  // Register authentication routes
+  registerAuthRoutes(app, {
+    appUrl: env.APP_URL,
+    fromEmail: env.FROM_EMAIL || "noreply@modmapper.com",
+  });
 
   // Register remaining routes (after compression so they get compressed)
   await registerRoutes(httpServer, app);

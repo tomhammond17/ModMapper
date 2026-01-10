@@ -5,13 +5,19 @@ import { rm, readFile } from "fs/promises";
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
 const allowlist = [
+  "bcrypt",
+  "connect-pg-simple",
   "cors",
   "date-fns",
   "drizzle-orm",
   "drizzle-zod",
   "express",
   "express-rate-limit",
+  "express-session",
   "multer",
+  "nodemailer",
+  "passport",
+  "passport-local",
   "pg",
   "ws",
   "zod",
