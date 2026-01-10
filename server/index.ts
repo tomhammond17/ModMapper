@@ -14,6 +14,7 @@ import { registerSSERoutes, registerRoutes } from "./routes";
 import { registerAuthRoutes } from "./routes/auth";
 import { registerBillingRoutes, handleStripeWebhook } from "./routes/billing";
 import { registerFolderRoutes } from "./routes/folders";
+import { registerVersionRoutes } from "./routes/versions";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { logger, logRequest, createLogger } from "./logger";
@@ -183,6 +184,9 @@ app.use(express.urlencoded({ extended: false }));
 
   // Register folder routes (Pro-only document organization)
   registerFolderRoutes(app);
+
+  // Register version routes (Pro-only version control)
+  registerVersionRoutes(app);
 
   // Register remaining routes (after compression so they get compressed)
   await registerRoutes(httpServer, app);
