@@ -12,7 +12,7 @@ import type { ConversionResult, ModbusSourceFormat, ModbusRegister } from "@shar
 import { createLogger } from "./logger";
 import { validateFileContent, validatePdfFile, validatePageRanges } from "./middleware/validation";
 import { isAbortError } from "./pdf-parser";
-import { optionalAuth, loadSubscription } from "./middleware/auth";
+import { optionalAuth, loadSubscription, requireAuth, requirePro } from "./middleware/auth";
 import { usageMiddleware } from "./middleware/usage";
 
 const log = createLogger("routes");
@@ -452,9 +452,31 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/v1/documents", documentLimiter, async (req, res) => {
+  // GET /api/v1/documents - List documents with optional folder filter
+  // For authenticated users, filters by userId; for Pro users, can filter by folder
+  app.get("/api/v1/documents", documentLimiter, optionalAuth, loadSubscription, async (req, res) => {
     try {
-      const documents = await storage.getAllDocuments();
+      const folderId = req.query.folderId as string | undefined;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+
+      // Build filter
+      const filter: { userId?: string; folderId?: string | null } = {};
+
+      // If user is authenticated, filter by their userId
+      if (req.user) {
+        filter.userId = req.user.id;
+      }
+
+      // Handle folder filter (Pro only)
+      if (folderId !== undefined && req.user) {
+        // Check if user is Pro for folder filtering
+        if (req.subscription?.tier === 'pro') {
+          filter.folderId = folderId === 'root' ? null : folderId;
+        }
+      }
+
+      const documents = await storage.getAllDocuments(filter, { limit, offset });
       return res.json({ success: true, documents });
     } catch (error) {
       return res.status(500).json({
@@ -464,9 +486,11 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/v1/documents/:id", documentLimiter, async (req, res) => {
+  app.get("/api/v1/documents/:id", documentLimiter, optionalAuth, async (req, res) => {
     try {
-      const document = await storage.getDocument(req.params.id);
+      // If user is authenticated, verify ownership
+      const userId = req.user?.id;
+      const document = await storage.getDocument(req.params.id, userId);
       if (!document) {
         return res.status(404).json({
           success: false,
@@ -482,9 +506,11 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/v1/documents/:id", documentLimiter, async (req, res) => {
+  app.delete("/api/v1/documents/:id", documentLimiter, optionalAuth, async (req, res) => {
     try {
-      const deleted = await storage.deleteDocument(req.params.id);
+      // If user is authenticated, verify ownership
+      const userId = req.user?.id;
+      const deleted = await storage.deleteDocument(req.params.id, userId);
       if (!deleted) {
         return res.status(404).json({
           success: false,
@@ -496,6 +522,28 @@ export async function registerRoutes(
       return res.status(500).json({
         success: false,
         message: "Failed to delete document",
+      });
+    }
+  });
+
+  // POST /api/v1/documents/:id/move - Move document to folder (Pro only)
+  app.post("/api/v1/documents/:id/move", requireAuth, loadSubscription, requirePro, async (req, res) => {
+    try {
+      const { folderId } = req.body;
+
+      if (!storage.moveDocument) {
+        return res.status(501).json({
+          success: false,
+          message: "Document moving not supported",
+        });
+      }
+
+      await storage.moveDocument(req.params.id, req.user!.id, folderId || null);
+      return res.json({ success: true, message: "Document moved" });
+    } catch (error: any) {
+      return res.status(400).json({
+        success: false,
+        message: error.message || "Failed to move document",
       });
     }
   });
