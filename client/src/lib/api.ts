@@ -15,6 +15,10 @@ export const apiEndpoints = {
   parsePdfStream: `${API_BASE}/parse-pdf-stream`,
   parsePdfWithHints: `${API_BASE}/parse-pdf-with-hints`,
   analyzePdf: `${API_BASE}/analyze-pdf`,
+  
+  // EventSource-based PDF processing (works better with proxies)
+  uploadPdf: `${API_BASE}/upload-pdf`,
+  processPdf: (fileId: string) => `${API_BASE}/process-pdf/${fileId}`,
 
   // Documents
   documents: `${API_BASE}/documents`,

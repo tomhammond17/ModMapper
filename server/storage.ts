@@ -347,3 +347,74 @@ export class PostgresStorage implements IStorage {
 // Use in-memory storage for this converter app (documents don't need to persist)
 // PostgresStorage is available if persistence is needed in the future
 export const storage: IStorage = new MemStorage();
+
+/**
+ * Temporary file storage for PDF uploads.
+ * Files are stored in memory with a TTL for automatic cleanup.
+ */
+export interface TempFile {
+  id: string;
+  buffer: Buffer;
+  filename: string;
+  pageRanges?: string;
+  existingRegisters?: ModbusRegister[];
+  createdAt: number;
+}
+
+class TempFileStorage {
+  private files: Map<string, TempFile> = new Map();
+  private readonly TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+  constructor() {
+    // Cleanup expired files every minute
+    setInterval(() => this.cleanup(), 60 * 1000);
+  }
+
+  store(buffer: Buffer, filename: string, pageRanges?: string, existingRegisters?: ModbusRegister[]): string {
+    const id = randomUUID();
+    this.files.set(id, {
+      id,
+      buffer,
+      filename,
+      pageRanges,
+      existingRegisters,
+      createdAt: Date.now(),
+    });
+    log.debug("Stored temp file", { id, filename, size: buffer.length });
+    return id;
+  }
+
+  get(id: string): TempFile | undefined {
+    const file = this.files.get(id);
+    if (!file) return undefined;
+    
+    // Check if expired
+    if (Date.now() - file.createdAt > this.TTL_MS) {
+      this.files.delete(id);
+      return undefined;
+    }
+    
+    return file;
+  }
+
+  delete(id: string): boolean {
+    return this.files.delete(id);
+  }
+
+  private cleanup() {
+    const now = Date.now();
+    let cleaned = 0;
+    const entries = Array.from(this.files.entries());
+    for (const [id, file] of entries) {
+      if (now - file.createdAt > this.TTL_MS) {
+        this.files.delete(id);
+        cleaned++;
+      }
+    }
+    if (cleaned > 0) {
+      log.debug("Cleaned up expired temp files", { count: cleaned });
+    }
+  }
+}
+
+export const tempFileStorage = new TempFileStorage();

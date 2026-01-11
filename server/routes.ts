@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import multer, { MulterError } from "multer";
-import { storage } from "./storage";
+import { storage, tempFileStorage } from "./storage";
 import { parseFile, detectFormat } from "./parsers";
 import { parsePdfFile, parsePdfWithPageHints, parsePageRanges, type PdfParseProgress } from "./pdf-parser";
 import { scoreAllPagesLightweight } from "./pdf-parser/extractor";
@@ -269,6 +269,178 @@ export async function registerSSERoutes(
     } catch (error) {
       if (isAbortError(error)) {
         log.info("PDF processing with hints cancelled", { filename });
+        sse.sendError("Processing cancelled");
+      } else {
+        const message = error instanceof Error ? error.message : "Failed to parse PDF";
+        sse.sendError(message);
+      }
+    }
+  });
+
+  // =====================================================================
+  // EventSource-based PDF processing (works better with proxies)
+  // =====================================================================
+
+  // Step 1: Upload PDF file and get a temporary file ID
+  app.post("/api/v1/upload-pdf", pdfParseLimiter, optionalAuth, loadSubscription, usageMiddleware, upload.single("file"), handleMulterError, validatePdfFile, async (req: Request, res: Response) => {
+    const filename = req.file!.originalname;
+    
+    // Parse optional page ranges and existing registers
+    let pageRanges: string | undefined;
+    let existingRegisters: ModbusRegister[] = [];
+    
+    if (req.body.pageRanges) {
+      pageRanges = req.body.pageRanges;
+    }
+    
+    try {
+      if (req.body.existingRegisters) {
+        existingRegisters = JSON.parse(req.body.existingRegisters);
+      }
+    } catch {
+      // Ignore parse errors
+    }
+    
+    // Store file temporarily
+    const fileId = tempFileStorage.store(req.file!.buffer, filename, pageRanges, existingRegisters);
+    
+    log.info("PDF uploaded for processing", { fileId, filename, hasPageRanges: !!pageRanges });
+    
+    return res.json({
+      success: true,
+      fileId,
+      filename,
+      message: "File uploaded successfully. Connect to process endpoint for real-time progress.",
+    });
+  });
+
+  // Step 2: Process PDF via EventSource (GET request for SSE compatibility)
+  app.get("/api/v1/process-pdf/:fileId", async (req: Request, res: Response) => {
+    const { fileId } = req.params;
+    
+    // Retrieve the uploaded file
+    const tempFile = tempFileStorage.get(fileId);
+    if (!tempFile) {
+      return res.status(404).json({
+        success: false,
+        error: "FILE_NOT_FOUND",
+        message: "File not found or expired. Please re-upload.",
+      });
+    }
+    
+    const { buffer, filename, pageRanges, existingRegisters } = tempFile;
+    
+    // Create abort controller for cancellation support
+    const abortController = new AbortController();
+    
+    // Set up SSE connection
+    const sse = createSSEConnection(res, {
+      timeoutMs: SSE_CONFIG.DEFAULT_TIMEOUT_MS,
+      onTimeout: () => {
+        log.warn("SSE timeout during PDF processing", { fileId, filename });
+        abortController.abort();
+      },
+      onClose: () => {
+        log.info("Client disconnected during PDF processing", { fileId, filename });
+        abortController.abort();
+      },
+    });
+    
+    const sendProgress = (progress: PdfParseProgress) => {
+      if (sse.isActive()) {
+        sse.sendProgress(progress.progress, progress.message, progress.details, {
+          stage: progress.stage,
+          totalBatches: progress.totalBatches,
+          currentBatch: progress.currentBatch,
+          totalPages: progress.totalPages,
+          pagesProcessed: progress.pagesProcessed,
+        });
+      }
+    };
+    
+    try {
+      let parseResult;
+      
+      if (pageRanges) {
+        // Parse with page hints
+        const hints = parsePageRanges(pageRanges);
+        parseResult = await parsePdfWithPageHints(
+          buffer,
+          hints,
+          existingRegisters || [],
+          sendProgress,
+          abortController.signal
+        );
+      } else {
+        // Check cache first
+        const cacheKey = pdfCache.getHash(buffer);
+        const cached = pdfCache.get(cacheKey);
+        
+        if (cached && cached.registers.length > 0) {
+          sse.sendProgress(100, "Retrieved from cache", undefined, { stage: "complete" });
+          
+          await storage.createDocument({
+            filename,
+            sourceFormat: "pdf" as ModbusSourceFormat,
+            registers: cached.registers,
+          });
+          
+          const result: ConversionResult = {
+            success: true,
+            message: `Retrieved ${cached.registers.length} registers from cache`,
+            registers: cached.registers,
+            sourceFormat: "pdf" as ModbusSourceFormat,
+            filename,
+            extractionMetadata: cached.metadata,
+          };
+          
+          sse.sendComplete(result);
+          tempFileStorage.delete(fileId);
+          return;
+        }
+        
+        // Full parse
+        parseResult = await parsePdfFile(buffer, sendProgress, abortController.signal);
+        
+        // Cache successful results
+        if (parseResult.registers.length > 0) {
+          pdfCache.set(cacheKey, parseResult);
+        }
+      }
+      
+      const { registers, metadata } = parseResult;
+      
+      if (!sse.isActive()) {
+        return;
+      }
+      
+      if (registers.length === 0) {
+        sse.sendError("No Modbus registers found in the PDF");
+        tempFileStorage.delete(fileId);
+        return;
+      }
+      
+      await storage.createDocument({
+        filename,
+        sourceFormat: "pdf" as ModbusSourceFormat,
+        registers,
+      });
+      
+      const result: ConversionResult = {
+        success: true,
+        message: `Successfully extracted ${registers.length} registers from PDF`,
+        registers,
+        sourceFormat: "pdf" as ModbusSourceFormat,
+        filename,
+        extractionMetadata: metadata,
+      };
+      
+      sse.sendComplete(result);
+      tempFileStorage.delete(fileId);
+    } catch (error) {
+      tempFileStorage.delete(fileId);
+      if (isAbortError(error)) {
+        log.info("PDF processing cancelled", { fileId, filename });
         sse.sendError("Processing cancelled");
       } else {
         const message = error instanceof Error ? error.message : "Failed to parse PDF";

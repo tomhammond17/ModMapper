@@ -1,5 +1,5 @@
 import { useReducer, useCallback, useRef } from "react";
-import { parseSSEStream, type SSEProgressData } from "@/lib/sse-parser";
+import { type SSEProgressData } from "@/lib/sse-parser";
 import { apiEndpoints } from "@/lib/api";
 import type { ConversionResult, ModbusRegister } from "@shared/schema";
 
@@ -119,7 +119,9 @@ export interface UsePdfProcessingResult {
 export function usePdfProcessing(): UsePdfProcessingResult {
   const [state, dispatch] = useReducer(processingReducer, initialState);
   
-  // AbortController reference for cancellation
+  // EventSource reference for cancellation
+  const eventSourceRef = useRef<EventSource | null>(null);
+  // AbortController for upload cancellation
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const parsePdfWithProgress = useCallback(
@@ -128,18 +130,15 @@ export function usePdfProcessing(): UsePdfProcessingResult {
       pageRanges?: string,
       existingRegisters?: ModbusRegister[]
     ): Promise<ConversionResult | null> => {
-      // Create new abort controller for this request
+      // Create new abort controller for upload
       abortControllerRef.current = new AbortController();
       
       dispatch({ type: "START_PROCESSING", message: "Uploading PDF..." });
 
       try {
+        // Step 1: Upload the file
         const formData = new FormData();
         formData.append("file", file);
-
-        const endpoint = pageRanges
-          ? apiEndpoints.parsePdfWithHints
-          : apiEndpoints.parsePdfStream;
 
         if (pageRanges) {
           formData.append("pageRanges", pageRanges);
@@ -149,33 +148,72 @@ export function usePdfProcessing(): UsePdfProcessingResult {
           );
         }
 
-        const response = await fetch(endpoint, {
+        const uploadResponse = await fetch(apiEndpoints.uploadPdf, {
           method: "POST",
           body: formData,
           signal: abortControllerRef.current.signal,
         });
 
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || "Failed to parse PDF");
+        if (!uploadResponse.ok) {
+          const error = await uploadResponse.json();
+          throw new Error(error.message || "Failed to upload PDF");
         }
 
-        let result: ConversionResult | null = null;
+        const uploadResult = await uploadResponse.json();
+        const { fileId } = uploadResult;
+        
+        console.debug("[PDF] File uploaded, starting EventSource", { fileId });
 
-        await parseSSEStream<ConversionResult>(response, {
-          onProgress: (progress, message, extra) => {
-            dispatch({ type: "UPDATE_PROGRESS", progress, message, extra });
-          },
-          onComplete: (data) => {
-            result = data;
-            dispatch({ type: "COMPLETE" });
-          },
-          onError: (error) => {
-            throw error;
-          },
+        // Step 2: Connect via EventSource for real-time progress
+        return new Promise<ConversionResult | null>((resolve, reject) => {
+          const eventSource = new EventSource(apiEndpoints.processPdf(fileId));
+          eventSourceRef.current = eventSource;
+          
+          let result: ConversionResult | null = null;
+
+          eventSource.onmessage = (event) => {
+            try {
+              const data = JSON.parse(event.data);
+              console.debug("[SSE]", data.type, data.type === "progress" ? { stage: data.stage, progress: data.progress } : "");
+
+              if (data.type === "progress") {
+                dispatch({ 
+                  type: "UPDATE_PROGRESS", 
+                  progress: data.progress, 
+                  message: data.message,
+                  extra: {
+                    stage: data.stage,
+                    totalBatches: data.totalBatches,
+                    currentBatch: data.currentBatch,
+                    totalPages: data.totalPages,
+                    pagesProcessed: data.pagesProcessed,
+                  }
+                });
+              } else if (data.type === "complete") {
+                result = data.result;
+                dispatch({ type: "COMPLETE" });
+                eventSource.close();
+                eventSourceRef.current = null;
+                resolve(result);
+              } else if (data.type === "error") {
+                eventSource.close();
+                eventSourceRef.current = null;
+                dispatch({ type: "ERROR" });
+                reject(new Error(data.message));
+              }
+            } catch (e) {
+              console.error("[SSE] Parse error:", e);
+            }
+          };
+
+          eventSource.onerror = (event) => {
+            console.error("[SSE] EventSource error:", event);
+            eventSource.close();
+            eventSourceRef.current = null;
+            dispatch({ type: "ERROR" });
+            reject(new Error("Connection to server lost"));
+          };
         });
-
-        return result;
       } catch (error) {
         // Handle abort errors gracefully
         if (isAbortError(error)) {
@@ -192,10 +230,17 @@ export function usePdfProcessing(): UsePdfProcessingResult {
   );
   
   const cancel = useCallback(() => {
+    // Cancel upload if in progress
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
+    // Close EventSource if connected
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+    dispatch({ type: "ERROR" });
   }, []);
 
   const setStep = useCallback((step: ConversionStep) => {
