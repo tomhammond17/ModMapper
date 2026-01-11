@@ -53,6 +53,9 @@ export async function parseSSEStream<T>(
     if (line.startsWith("data: ")) {
       try {
         const data = JSON.parse(line.slice(6)) as SSEEvent<T>;
+        
+        // Debug logging for SSE events
+        console.debug("[SSE]", data.type, data.type === "progress" ? { stage: data.stage, progress: data.progress } : "");
 
         if (data.type === "progress") {
           callbacks.onProgress(data.progress, data.message, {

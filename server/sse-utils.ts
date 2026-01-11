@@ -126,6 +126,10 @@ export function createSSEConnection(
             details,
             ...extra
           })}\n\n`);
+          // Force flush to ensure immediate delivery (critical for SSE)
+          if (typeof (res as any).flush === 'function') {
+            (res as any).flush();
+          }
         } catch {
           cleanup();
         }
@@ -136,6 +140,10 @@ export function createSSEConnection(
       if (isConnectionActive) {
         try {
           res.write(`data: ${JSON.stringify({ type: "complete", result })}\n\n`);
+          // Force flush before ending
+          if (typeof (res as any).flush === 'function') {
+            (res as any).flush();
+          }
           res.end();
         } catch {
           // Connection already closed
@@ -148,6 +156,10 @@ export function createSSEConnection(
       if (isConnectionActive) {
         try {
           res.write(`data: ${JSON.stringify({ type: "error", message })}\n\n`);
+          // Force flush before ending
+          if (typeof (res as any).flush === 'function') {
+            (res as any).flush();
+          }
           res.end();
         } catch {
           // Connection already closed

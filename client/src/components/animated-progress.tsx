@@ -172,7 +172,7 @@ export function AnimatedProgress({
         <div className="flex items-center gap-2 p-3 rounded-md bg-blue-500/10 border border-blue-500/20">
           <Info className="h-4 w-4 text-blue-500 flex-shrink-0" />
           <p className="text-xs text-blue-600 dark:text-blue-400" data-testid="text-time-estimate">
-            Typical extraction takes about 5 seconds per page.
+            Typical extraction takes 20-30 seconds per page.
             {pagesProcessed > 0 && ` Processing ${pagesProcessed} pages.`}
           </p>
         </div>
