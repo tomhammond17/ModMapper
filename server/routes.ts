@@ -111,7 +111,7 @@ export async function registerSSERoutes(
         filename,
         sourceFormat: "pdf" as ModbusSourceFormat,
         registers: cached.registers,
-      });
+      }, req.user?.id);
 
       const result: ConversionResult = {
         success: true,
@@ -159,7 +159,7 @@ export async function registerSSERoutes(
         filename,
         sourceFormat: "pdf" as ModbusSourceFormat,
         registers,
-      });
+      }, req.user?.id);
 
       const result: ConversionResult = {
         success: true,
@@ -254,7 +254,7 @@ export async function registerSSERoutes(
         filename,
         sourceFormat: "pdf" as ModbusSourceFormat,
         registers,
-      });
+      }, req.user?.id);
 
       const result: ConversionResult = {
         success: true,
@@ -301,10 +301,11 @@ export async function registerSSERoutes(
       // Ignore parse errors
     }
     
-    // Store file temporarily
-    const fileId = tempFileStorage.store(req.file!.buffer, filename, pageRanges, existingRegisters);
+    // Store file temporarily with user ID for document association
+    const userId = req.user?.id;
+    const fileId = tempFileStorage.store(req.file!.buffer, filename, pageRanges, existingRegisters, userId);
     
-    log.info("PDF uploaded for processing", { fileId, filename, hasPageRanges: !!pageRanges });
+    log.info("PDF uploaded for processing", { fileId, filename, hasPageRanges: !!pageRanges, userId: userId || 'anonymous' });
     
     return res.json({
       success: true,
@@ -315,7 +316,8 @@ export async function registerSSERoutes(
   });
 
   // Step 2: Process PDF via EventSource (GET request for SSE compatibility)
-  app.get("/api/v1/process-pdf/:fileId", async (req: Request, res: Response) => {
+  // Auth middleware validates the caller matches the stored userId
+  app.get("/api/v1/process-pdf/:fileId", optionalAuth, async (req: Request, res: Response) => {
     const { fileId } = req.params;
     
     // Retrieve the uploaded file
@@ -328,7 +330,17 @@ export async function registerSSERoutes(
       });
     }
     
-    const { buffer, filename, pageRanges, existingRegisters } = tempFile;
+    const { buffer, filename, pageRanges, existingRegisters, userId } = tempFile;
+    
+    // Security: Verify the caller matches the original uploader
+    // If the file was uploaded by an authenticated user, only that user can process it
+    if (userId && req.user?.id !== userId) {
+      return res.status(403).json({
+        success: false,
+        error: "ACCESS_DENIED",
+        message: "You don't have permission to process this file.",
+      });
+    }
     
     // Create abort controller for cancellation support
     const abortController = new AbortController();
@@ -383,7 +395,7 @@ export async function registerSSERoutes(
             filename,
             sourceFormat: "pdf" as ModbusSourceFormat,
             registers: cached.registers,
-          });
+          }, userId);
           
           const result: ConversionResult = {
             success: true,
@@ -424,7 +436,7 @@ export async function registerSSERoutes(
         filename,
         sourceFormat: "pdf" as ModbusSourceFormat,
         registers,
-      });
+      }, userId);
       
       const result: ConversionResult = {
         success: true,
@@ -511,7 +523,7 @@ export async function registerRoutes(
             filename,
             sourceFormat: "pdf" as ModbusSourceFormat,
             registers,
-          });
+          }, req.user?.id);
 
           const result: ConversionResult = {
             success: true,
@@ -545,7 +557,7 @@ export async function registerRoutes(
         filename,
         sourceFormat: format,
         registers,
-      });
+      }, req.user?.id);
 
       const result: ConversionResult = {
         success: true,

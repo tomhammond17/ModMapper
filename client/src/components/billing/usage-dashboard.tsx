@@ -20,7 +20,7 @@ export function UsageDashboard() {
   const { isAuthenticated, isPro } = useAuth();
   const [, setLocation] = useLocation();
 
-  const { data, isLoading } = useQuery<UsageData>({
+  const { data, isLoading, isError } = useQuery<UsageData>({
     queryKey: ["billing", "usage"],
     queryFn: async () => {
       const res = await fetch("/api/v1/billing/usage", { credentials: "include" });
@@ -48,7 +48,20 @@ export function UsageDashboard() {
     );
   }
 
-  if (!data) return null;
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Usage This Month</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">Unable to load usage data. Please try again later.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!data || !data.conversions || !data.tokens) return null;
 
   const conversionsUnlimited = data.conversions.limit === -1 || data.conversions.limit === Infinity;
   const tokensUnlimited = data.tokens.limit === -1 || data.tokens.limit === Infinity;

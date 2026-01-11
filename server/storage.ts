@@ -358,6 +358,7 @@ export interface TempFile {
   filename: string;
   pageRanges?: string;
   existingRegisters?: ModbusRegister[];
+  userId?: string;
   createdAt: number;
 }
 
@@ -370,7 +371,7 @@ class TempFileStorage {
     setInterval(() => this.cleanup(), 60 * 1000);
   }
 
-  store(buffer: Buffer, filename: string, pageRanges?: string, existingRegisters?: ModbusRegister[]): string {
+  store(buffer: Buffer, filename: string, pageRanges?: string, existingRegisters?: ModbusRegister[], userId?: string): string {
     const id = randomUUID();
     this.files.set(id, {
       id,
@@ -378,9 +379,10 @@ class TempFileStorage {
       filename,
       pageRanges,
       existingRegisters,
+      userId,
       createdAt: Date.now(),
     });
-    log.debug("Stored temp file", { id, filename, size: buffer.length });
+    log.debug("Stored temp file", { id, filename, size: buffer.length, userId: userId || 'anonymous' });
     return id;
   }
 
