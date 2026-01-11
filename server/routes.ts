@@ -107,11 +107,14 @@ export async function registerSSERoutes(
     if (cached && cached.registers.length > 0) {
       sse.sendProgress(100, "Retrieved from cache");
 
-      await storage.createDocument({
-        filename,
-        sourceFormat: "pdf" as ModbusSourceFormat,
-        registers: cached.registers,
-      }, req.user?.id);
+      // Only persist documents for authenticated users
+      if (req.user?.id) {
+        await storage.createDocument({
+          filename,
+          sourceFormat: "pdf" as ModbusSourceFormat,
+          registers: cached.registers,
+        }, req.user.id);
+      }
 
       const result: ConversionResult = {
         success: true,
@@ -155,11 +158,14 @@ export async function registerSSERoutes(
       // Cache successful results
       pdfCache.set(cacheKey, parseResult);
 
-      await storage.createDocument({
-        filename,
-        sourceFormat: "pdf" as ModbusSourceFormat,
-        registers,
-      }, req.user?.id);
+      // Only persist documents for authenticated users
+      if (req.user?.id) {
+        await storage.createDocument({
+          filename,
+          sourceFormat: "pdf" as ModbusSourceFormat,
+          registers,
+        }, req.user.id);
+      }
 
       const result: ConversionResult = {
         success: true,
@@ -250,11 +256,14 @@ export async function registerSSERoutes(
         return;
       }
 
-      await storage.createDocument({
-        filename,
-        sourceFormat: "pdf" as ModbusSourceFormat,
-        registers,
-      }, req.user?.id);
+      // Only persist documents for authenticated users
+      if (req.user?.id) {
+        await storage.createDocument({
+          filename,
+          sourceFormat: "pdf" as ModbusSourceFormat,
+          registers,
+        }, req.user.id);
+      }
 
       const result: ConversionResult = {
         success: true,
@@ -391,11 +400,14 @@ export async function registerSSERoutes(
         if (cached && cached.registers.length > 0) {
           sse.sendProgress(100, "Retrieved from cache", undefined, { stage: "complete" });
           
-          await storage.createDocument({
-            filename,
-            sourceFormat: "pdf" as ModbusSourceFormat,
-            registers: cached.registers,
-          }, userId);
+          // Only persist documents for authenticated users
+          if (userId) {
+            await storage.createDocument({
+              filename,
+              sourceFormat: "pdf" as ModbusSourceFormat,
+              registers: cached.registers,
+            }, userId);
+          }
           
           const result: ConversionResult = {
             success: true,
@@ -432,11 +444,14 @@ export async function registerSSERoutes(
         return;
       }
       
-      await storage.createDocument({
-        filename,
-        sourceFormat: "pdf" as ModbusSourceFormat,
-        registers,
-      }, userId);
+      // Only persist documents for authenticated users
+      if (userId) {
+        await storage.createDocument({
+          filename,
+          sourceFormat: "pdf" as ModbusSourceFormat,
+          registers,
+        }, userId);
+      }
       
       const result: ConversionResult = {
         success: true,
@@ -519,11 +534,14 @@ export async function registerRoutes(
             return jsonError(res, "No Modbus registers found in the PDF. The document may not contain recognizable register tables.");
           }
 
-          await storage.createDocument({
-            filename,
-            sourceFormat: "pdf" as ModbusSourceFormat,
-            registers,
-          }, req.user?.id);
+          // Only persist documents for authenticated users
+          if (req.user?.id) {
+            await storage.createDocument({
+              filename,
+              sourceFormat: "pdf" as ModbusSourceFormat,
+              registers,
+            }, req.user.id);
+          }
 
           const result: ConversionResult = {
             success: true,
@@ -553,11 +571,14 @@ export async function registerRoutes(
         return jsonError(res, "No valid registers found in the file");
       }
 
-      await storage.createDocument({
-        filename,
-        sourceFormat: format,
-        registers,
-      }, req.user?.id);
+      // Only persist documents for authenticated users
+      if (req.user?.id) {
+        await storage.createDocument({
+          filename,
+          sourceFormat: format,
+          registers,
+        }, req.user.id);
+      }
 
       const result: ConversionResult = {
         success: true,
