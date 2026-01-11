@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
 import { pdfjsLib } from "@/lib/pdf-worker";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -7,17 +6,11 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Search,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  ZoomIn,
-  ZoomOut,
-  X,
-  FileText,
-  Loader2,
-} from "lucide-react";
+import { Search, Check, X, FileText, Loader2 } from "lucide-react";
+import { usePdfDocument } from "@/hooks/use-pdf-document";
+import { useThumbnailRenderer } from "@/hooks/use-thumbnail-renderer";
+import { usePdfSearch } from "@/hooks/use-pdf-search";
+import { ThumbnailItem, PdfViewerToolbar } from "@/components/pdf-viewer/index";
 
 interface PdfViewerProps {
   file: File | null;
@@ -27,20 +20,7 @@ interface PdfViewerProps {
   initialSelectedPages?: number[];
 }
 
-interface ThumbnailData {
-  pageNum: number;
-  dataUrl: string | null;
-  loading: boolean;
-}
-
-interface SearchResult {
-  pageNum: number;
-  matches: number;
-}
-
-const THUMBNAIL_SCALE = 0.25;
 const RENDER_SCALE_BASE = 1.5;
-const MAX_THUMBNAILS_PER_BATCH = 10;
 
 export function PdfViewer({
   file,
@@ -49,33 +29,33 @@ export function PdfViewer({
   onPagesSelected,
   initialSelectedPages = [],
 }: PdfViewerProps) {
-  const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
-  const [numPages, setNumPages] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedPages, setSelectedPages] = useState<Set<number>>(
     new Set(initialSelectedPages)
   );
-  const [thumbnails, setThumbnails] = useState<Map<number, ThumbnailData>>(
-    new Map()
-  );
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
   const [zoom, setZoom] = useState(1);
-  const [loading, setLoading] = useState(true);
   const [pageLoading, setPageLoading] = useState(false);
 
   const mainCanvasRef = useRef<HTMLCanvasElement>(null);
   const textLayerRef = useRef<HTMLDivElement>(null);
-  const thumbnailQueueRef = useRef<number[]>([]);
-  const isRenderingThumbnailsRef = useRef(false);
-  const isOpenRef = useRef(open);
   const currentFileRef = useRef<File | null>(null);
 
-  useEffect(() => {
-    isOpenRef.current = open;
-  }, [open]);
+  // Use extracted hooks
+  const { pdfDoc, numPages, loading } = usePdfDocument({ file, open });
+  const { thumbnails, loadMoreThumbnails } = useThumbnailRenderer({
+    pdfDoc,
+    numPages,
+    open,
+  });
+  const {
+    searchQuery,
+    setSearchQuery,
+    searchResults,
+    isSearching,
+    handleSearch,
+  } = usePdfSearch({ pdfDoc, numPages });
 
+  // Reset selected pages when file changes
   useEffect(() => {
     if (file !== currentFileRef.current) {
       currentFileRef.current = file;
@@ -83,137 +63,14 @@ export function PdfViewer({
     }
   }, [file]);
 
+  // Reset current page when PDF loads
   useEffect(() => {
-    if (!file || !open) return;
-
-    let cancelled = false;
-
     if (pdfDoc) {
-      pdfDoc.destroy();
-      setPdfDoc(null);
+      setCurrentPage(1);
     }
-    thumbnailQueueRef.current = [];
-    isRenderingThumbnailsRef.current = false;
-    setThumbnails(new Map());
-
-    const loadPdf = async () => {
-      setLoading(true);
-      try {
-        const arrayBuffer = await file.arrayBuffer();
-        const doc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        if (cancelled) {
-          doc.destroy();
-          return;
-        }
-        setPdfDoc(doc);
-        setNumPages(doc.numPages);
-        setCurrentPage(1);
-        setSearchResults([]);
-        setSearchQuery("");
-      } catch (error) {
-        console.error("Failed to load PDF:", error);
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadPdf();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [file, open]);
-
-  useEffect(() => {
-    if (!pdfDoc || !open) return;
-
-    const pagesToLoad: number[] = [];
-    for (let i = 1; i <= Math.min(numPages, MAX_THUMBNAILS_PER_BATCH); i++) {
-      if (!thumbnails.has(i)) {
-        pagesToLoad.push(i);
-      }
-    }
-
-    if (pagesToLoad.length > 0) {
-      thumbnailQueueRef.current = [...pagesToLoad, ...thumbnailQueueRef.current.filter(p => !pagesToLoad.includes(p))];
-      processThumbnailQueue();
-    }
-  }, [pdfDoc, numPages, open]);
-
-  const processThumbnailQueue = useCallback(async () => {
-    if (isRenderingThumbnailsRef.current || !pdfDoc) return;
-
-    isRenderingThumbnailsRef.current = true;
-
-    while (thumbnailQueueRef.current.length > 0 && isOpenRef.current) {
-      const pageNum = thumbnailQueueRef.current.shift()!;
-      
-      if (!isOpenRef.current) break;
-
-      setThumbnails((prev) => {
-        const newMap = new Map(prev);
-        if (!newMap.has(pageNum)) {
-          newMap.set(pageNum, { pageNum, dataUrl: null, loading: true });
-        }
-        return newMap;
-      });
-
-      try {
-        const page = await pdfDoc.getPage(pageNum);
-        const viewport = page.getViewport({ scale: THUMBNAIL_SCALE });
-
-        const canvas = document.createElement("canvas");
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        const ctx = canvas.getContext("2d")!;
-
-        await page.render({ canvasContext: ctx, viewport, canvas }).promise;
-
-        const dataUrl = canvas.toDataURL();
-        page.cleanup();
-
-        setThumbnails((prev) => {
-          const newMap = new Map(prev);
-          newMap.set(pageNum, { pageNum, dataUrl, loading: false });
-          return newMap;
-        });
-      } catch (error) {
-        console.error(`Failed to render thumbnail for page ${pageNum}:`, error);
-        setThumbnails((prev) => {
-          const newMap = new Map(prev);
-          newMap.set(pageNum, { pageNum, dataUrl: null, loading: false });
-          return newMap;
-        });
-      }
-    }
-
-    isRenderingThumbnailsRef.current = false;
   }, [pdfDoc]);
 
-  const loadMoreThumbnails = useCallback(() => {
-    if (!pdfDoc) return;
-
-    const loadedCount = thumbnails.size;
-    const nextBatch: number[] = [];
-
-    for (
-      let i = loadedCount + 1;
-      i <= Math.min(loadedCount + MAX_THUMBNAILS_PER_BATCH, numPages);
-      i++
-    ) {
-      if (!thumbnails.has(i)) {
-        nextBatch.push(i);
-      }
-    }
-
-    if (nextBatch.length > 0) {
-      thumbnailQueueRef.current = [...thumbnailQueueRef.current, ...nextBatch];
-      processThumbnailQueue();
-    }
-  }, [pdfDoc, thumbnails, numPages, processThumbnailQueue]);
-
+  // Render main page canvas
   useEffect(() => {
     if (!pdfDoc || !mainCanvasRef.current || !open) return;
 
@@ -281,43 +138,6 @@ export function PdfViewer({
     };
   }, [pdfDoc, currentPage, zoom, open]);
 
-  const handleSearch = useCallback(async () => {
-    if (!pdfDoc || !searchQuery.trim()) {
-      setSearchResults([]);
-      return;
-    }
-
-    setIsSearching(true);
-    const results: SearchResult[] = [];
-    const query = searchQuery.toLowerCase();
-
-    try {
-      for (let i = 1; i <= numPages; i++) {
-        const page = await pdfDoc.getPage(i);
-        const textContent = await page.getTextContent();
-        let matches = 0;
-
-        for (const item of textContent.items) {
-          if ("str" in item && item.str.toLowerCase().includes(query)) {
-            matches++;
-          }
-        }
-
-        if (matches > 0) {
-          results.push({ pageNum: i, matches });
-        }
-
-        page.cleanup();
-      }
-
-      setSearchResults(results);
-    } catch (error) {
-      console.error("Search failed:", error);
-    } finally {
-      setIsSearching(false);
-    }
-  }, [pdfDoc, searchQuery, numPages]);
-
   const togglePageSelection = useCallback((pageNum: number) => {
     setSelectedPages((prev) => {
       const next = new Set(prev);
@@ -358,19 +178,26 @@ export function PdfViewer({
     return ranges.join(", ");
   }, [selectedPages]);
 
-  const handleClose = useCallback(() => {
-    onOpenChange(false);
-  }, [onOpenChange]);
+  // Navigation handlers
+  const handlePrevPage = useCallback(() => {
+    setCurrentPage((p) => Math.max(1, p - 1));
+  }, []);
 
-  useEffect(() => {
-    if (!open) {
-      pdfDoc?.destroy();
-      setPdfDoc(null);
-      setThumbnails(new Map());
-      thumbnailQueueRef.current = [];
-      isRenderingThumbnailsRef.current = false;
-    }
-  }, [open]);
+  const handleNextPage = useCallback(() => {
+    setCurrentPage((p) => Math.min(numPages, p + 1));
+  }, [numPages]);
+
+  const handleZoomIn = useCallback(() => {
+    setZoom((z) => Math.min(3, z + 0.25));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setZoom((z) => Math.max(0.5, z - 0.25));
+  }, []);
+
+  const handleToggleCurrentPage = useCallback(() => {
+    togglePageSelection(currentPage);
+  }, [togglePageSelection, currentPage]);
 
   if (!file) return null;
 
@@ -410,6 +237,7 @@ export function PdfViewer({
         </DialogHeader>
 
         <div className="flex flex-1 min-h-0">
+          {/* Sidebar with search and thumbnails */}
           <div className="w-56 border-r flex flex-col bg-muted/30">
             <div className="p-3 border-b space-y-2">
               <div className="flex gap-2">
@@ -456,74 +284,20 @@ export function PdfViewer({
                 ) : (
                   <>
                     {Array.from({ length: numPages }, (_, i) => i + 1).map(
-                      (pageNum) => {
-                        const thumb = thumbnails.get(pageNum);
-                        const isSelected = selectedPages.has(pageNum);
-                        const isCurrentPage = currentPage === pageNum;
-                        const searchMatch = searchResults.find(
-                          (r) => r.pageNum === pageNum
-                        );
-
-                        return (
-                          <div
-                            key={pageNum}
-                            className={`relative rounded-md overflow-hidden cursor-pointer transition-all ${
-                              isCurrentPage
-                                ? "ring-2 ring-primary"
-                                : "ring-1 ring-border"
-                            } ${isSelected ? "ring-2 ring-primary bg-primary/10" : ""}`}
-                            onClick={() => setCurrentPage(pageNum)}
-                            data-testid={`thumbnail-page-${pageNum}`}
-                          >
-                            {thumb?.dataUrl ? (
-                              <img
-                                src={thumb.dataUrl}
-                                alt={`Page ${pageNum}`}
-                                className="w-full"
-                              />
-                            ) : thumb?.loading ? (
-                              <div className="w-full aspect-[8.5/11] flex items-center justify-center bg-muted">
-                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                              </div>
-                            ) : (
-                              <div className="w-full aspect-[8.5/11] flex items-center justify-center bg-muted">
-                                <FileText className="h-6 w-6 text-muted-foreground" />
-                              </div>
-                            )}
-
-                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-1">
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs text-white font-medium">
-                                  {pageNum}
-                                </span>
-                                {searchMatch && (
-                                  <Badge
-                                    variant="secondary"
-                                    className="text-[10px] h-4 px-1"
-                                  >
-                                    {searchMatch.matches}
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-
-                            <button
-                              className={`absolute top-1 right-1 w-5 h-5 rounded-sm flex items-center justify-center transition-colors ${
-                                isSelected
-                                  ? "bg-primary text-primary-foreground"
-                                  : "bg-white/80 text-muted-foreground hover:bg-white"
-                              }`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                togglePageSelection(pageNum);
-                              }}
-                              data-testid={`checkbox-page-${pageNum}`}
-                            >
-                              {isSelected && <Check className="h-3 w-3" />}
-                            </button>
-                          </div>
-                        );
-                      }
+                      (pageNum) => (
+                        <ThumbnailItem
+                          key={pageNum}
+                          pageNum={pageNum}
+                          thumbnail={thumbnails.get(pageNum)}
+                          isSelected={selectedPages.has(pageNum)}
+                          isCurrentPage={currentPage === pageNum}
+                          searchMatch={searchResults.find(
+                            (r) => r.pageNum === pageNum
+                          )}
+                          onPageClick={setCurrentPage}
+                          onToggleSelection={togglePageSelection}
+                        />
+                      )
                     )}
                     {thumbnails.size < numPages && (
                       <Button
@@ -542,74 +316,19 @@ export function PdfViewer({
             </ScrollArea>
           </div>
 
+          {/* Main content area */}
           <div className="flex-1 flex flex-col min-w-0">
-            <div className="flex items-center justify-between gap-4 px-4 py-2 border-b bg-muted/30">
-              <div className="flex items-center gap-2">
-                <Button
-                  size="icon"
-                  variant="outline"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage <= 1}
-                  data-testid="button-prev-page"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-sm min-w-[80px] text-center">
-                  Page {currentPage} of {numPages}
-                </span>
-                <Button
-                  size="icon"
-                  variant="outline"
-                  onClick={() =>
-                    setCurrentPage((p) => Math.min(numPages, p + 1))
-                  }
-                  disabled={currentPage >= numPages}
-                  data-testid="button-next-page"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  size="icon"
-                  variant="outline"
-                  onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))}
-                  disabled={zoom <= 0.5}
-                  data-testid="button-zoom-out"
-                >
-                  <ZoomOut className="h-4 w-4" />
-                </Button>
-                <span className="text-sm min-w-[60px] text-center">
-                  {Math.round(zoom * 100)}%
-                </span>
-                <Button
-                  size="icon"
-                  variant="outline"
-                  onClick={() => setZoom((z) => Math.min(3, z + 0.25))}
-                  disabled={zoom >= 3}
-                  data-testid="button-zoom-in"
-                >
-                  <ZoomIn className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <Button
-                variant={selectedPages.has(currentPage) ? "default" : "outline"}
-                size="sm"
-                onClick={() => togglePageSelection(currentPage)}
-                data-testid="button-toggle-current-page"
-              >
-                {selectedPages.has(currentPage) ? (
-                  <>
-                    <Check className="h-4 w-4 mr-1" />
-                    Selected
-                  </>
-                ) : (
-                  "Select This Page"
-                )}
-              </Button>
-            </div>
+            <PdfViewerToolbar
+              currentPage={currentPage}
+              numPages={numPages}
+              zoom={zoom}
+              isCurrentPageSelected={selectedPages.has(currentPage)}
+              onPrevPage={handlePrevPage}
+              onNextPage={handleNextPage}
+              onZoomIn={handleZoomIn}
+              onZoomOut={handleZoomOut}
+              onToggleCurrentPage={handleToggleCurrentPage}
+            />
 
             <ScrollArea className="flex-1">
               <div className="flex items-center justify-center p-4 min-h-full">
