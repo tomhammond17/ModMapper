@@ -1,8 +1,10 @@
-import { and, eq, or, desc } from 'drizzle-orm';
-import { getDb, isDatabaseAvailable } from '../db';
+import { and, eq, or, desc, type InferSelectModel } from 'drizzle-orm';
 import { documentsTable } from '../../shared/schema';
 import type { ModbusDocument, ModbusRegister, ModbusSourceFormat } from '../../shared/schema';
+
+type DocumentRow = InferSelectModel<typeof documentsTable>;
 import { createLogger } from '../logger';
+import { requireDb, withDbOrDefault, withErrorLogging } from '../utils/service-helpers';
 
 const log = createLogger('versions-service');
 
@@ -30,11 +32,7 @@ export async function createVersion(
   userId: string,
   registers: ModbusRegister[]
 ): Promise<ModbusDocument> {
-  if (!isDatabaseAvailable()) {
-    throw new Error('Database not available');
-  }
-
-  const db = getDb();
+  const db = requireDb();
 
   // Get current latest version
   const [current] = await db
@@ -51,7 +49,7 @@ export async function createVersion(
     throw new Error('Document not found');
   }
 
-  try {
+  return withErrorLogging(log, 'create version', { documentId, userId }, async () => {
     // Mark current as not latest
     await db
       .update(documentsTable)
@@ -80,10 +78,7 @@ export async function createVersion(
     });
 
     return mapToDocument(newVersion);
-  } catch (error) {
-    log.error('Failed to create version', { error, documentId, userId });
-    throw error;
-  }
+  });
 }
 
 /**
@@ -93,13 +88,7 @@ export async function getVersionHistory(
   documentId: string,
   userId: string
 ): Promise<ModbusDocument[]> {
-  if (!isDatabaseAvailable()) {
-    return [];
-  }
-
-  const db = getDb();
-
-  try {
+  return withDbOrDefault([], async (db) => {
     // Get all versions (the original and all children)
     const versions = await db
       .select()
@@ -114,10 +103,7 @@ export async function getVersionHistory(
       .orderBy(desc(documentsTable.versionNumber));
 
     return versions.map(mapToDocument);
-  } catch (error) {
-    log.error('Failed to get version history', { error, documentId, userId });
-    throw error;
-  }
+  });
 }
 
 /**
@@ -128,13 +114,7 @@ export async function getVersion(
   versionNumber: number,
   userId: string
 ): Promise<ModbusDocument | null> {
-  if (!isDatabaseAvailable()) {
-    return null;
-  }
-
-  const db = getDb();
-
-  try {
+  return withDbOrDefault(null, async (db) => {
     // Find version by number in the document family
     const [version] = await db
       .select()
@@ -150,10 +130,7 @@ export async function getVersion(
       .limit(1);
 
     return version ? mapToDocument(version) : null;
-  } catch (error) {
-    log.error('Failed to get version', { error, documentId, versionNumber, userId });
-    throw error;
-  }
+  });
 }
 
 /**
@@ -219,13 +196,7 @@ export async function checkDuplicateFilename(
   filename: string,
   folderId?: string | null
 ): Promise<{ exists: boolean; documentId?: string }> {
-  if (!isDatabaseAvailable()) {
-    return { exists: false };
-  }
-
-  const db = getDb();
-
-  try {
+  return withDbOrDefault({ exists: false }, async (db) => {
     const conditions = [
       eq(documentsTable.userId, userId),
       eq(documentsTable.filename, filename),
@@ -245,10 +216,7 @@ export async function checkDuplicateFilename(
     return existing
       ? { exists: true, documentId: existing.id }
       : { exists: false };
-  } catch (error) {
-    log.error('Failed to check duplicate filename', { error, userId, filename });
-    return { exists: false };
-  }
+  });
 }
 
 /**
@@ -268,7 +236,7 @@ function detectChanges(old: ModbusRegister, newReg: ModbusRegister): string[] {
 /**
  * Map database row to document
  */
-function mapToDocument(row: any): ModbusDocument {
+function mapToDocument(row: DocumentRow): ModbusDocument {
   return {
     id: row.id,
     filename: row.filename,
@@ -290,13 +258,7 @@ export async function getLatestVersion(
   documentId: string,
   userId: string
 ): Promise<ModbusDocument | null> {
-  if (!isDatabaseAvailable()) {
-    return null;
-  }
-
-  const db = getDb();
-
-  try {
+  return withDbOrDefault(null, async (db) => {
     // First check if this is the root document or a version
     const [root] = await db
       .select()
@@ -329,8 +291,5 @@ export async function getLatestVersion(
       .limit(1);
 
     return latest ? mapToDocument(latest) : null;
-  } catch (error) {
-    log.error('Failed to get latest version', { error, documentId, userId });
-    throw error;
-  }
+  });
 }

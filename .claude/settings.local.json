@@ -3,7 +3,28 @@
     "allow": [
       "Bash(git init:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git checkout:*)",
+      "Bash(npm run check:*)",
+      "Bash(timeout 15 npm run dev)",
+      "Bash(timeout 10 npm run dev:*)",
+      "Bash(npx tsc:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(npm test)",
+      "Bash(npm test -- --run)",
+      "Bash(npm test -- --run server/__tests__/services/subscription.test.ts)",
+      "Bash(npm test -- --run server/__tests__/services/auth.test.ts)",
+      "Bash(npm test -- --run server/__tests__/sse-utils.test.ts)",
+      "Bash(npm test -- --run server/__tests__/services/folders.test.ts)",
+      "Bash(npm test -- --run client/src/components/billing/__tests__/usage-dashboard.test.tsx)",
+      "Bash(npm install:*)",
+      "Bash(npm test:*)",
+      "Bash(cat:*)",
+      "Bash(git remote add:*)"
     ]
+  },
+  "enabledPlugins": {
+    "code-simplifier@claude-plugins-official": true
   }
 }

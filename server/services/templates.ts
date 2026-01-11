@@ -1,8 +1,8 @@
 import { and, eq, asc } from 'drizzle-orm';
-import { getDb, isDatabaseAvailable } from '../db';
 import { exportTemplatesTable } from '../../shared/schema';
 import type { TemplateConfig, ExportTemplate, ModbusRegister } from '../../shared/schema';
 import { createLogger } from '../logger';
+import { requireDb, withDbOrDefault, withErrorLogging } from '../utils/service-helpers';
 
 const log = createLogger('templates-service');
 
@@ -15,13 +15,9 @@ export async function createTemplate(
   format: 'csv' | 'json' | 'xml',
   config: TemplateConfig
 ): Promise<ExportTemplate> {
-  if (!isDatabaseAvailable()) {
-    throw new Error('Database not available');
-  }
+  const db = requireDb();
 
-  const db = getDb();
-
-  try {
+  return withErrorLogging(log, 'create template', { userId, name }, async () => {
     const [template] = await db
       .insert(exportTemplatesTable)
       .values({
@@ -35,20 +31,8 @@ export async function createTemplate(
 
     log.info('Created template', { userId, name, format });
 
-    return {
-      id: template.id,
-      userId: template.userId,
-      name: template.name,
-      format: template.format as 'csv' | 'json' | 'xml',
-      config: template.config,
-      isDefault: template.isDefault,
-      createdAt: template.createdAt,
-      updatedAt: template.updatedAt,
-    };
-  } catch (error) {
-    log.error('Failed to create template', { error, userId, name });
-    throw error;
-  }
+    return mapToTemplate(template);
+  });
 }
 
 /**
@@ -58,13 +42,7 @@ export async function getTemplates(
   userId: string,
   format?: string
 ): Promise<ExportTemplate[]> {
-  if (!isDatabaseAvailable()) {
-    return [];
-  }
-
-  const db = getDb();
-
-  try {
+  return withDbOrDefault([], async (db) => {
     const conditions = [eq(exportTemplatesTable.userId, userId)];
 
     if (format) {
@@ -77,20 +55,8 @@ export async function getTemplates(
       .where(and(...conditions))
       .orderBy(asc(exportTemplatesTable.name));
 
-    return templates.map(t => ({
-      id: t.id,
-      userId: t.userId,
-      name: t.name,
-      format: t.format as 'csv' | 'json' | 'xml',
-      config: t.config,
-      isDefault: t.isDefault,
-      createdAt: t.createdAt,
-      updatedAt: t.updatedAt,
-    }));
-  } catch (error) {
-    log.error('Failed to get templates', { error, userId });
-    throw error;
-  }
+    return templates.map(mapToTemplate);
+  });
 }
 
 /**
@@ -100,13 +66,7 @@ export async function getTemplate(
   templateId: string,
   userId: string
 ): Promise<ExportTemplate | null> {
-  if (!isDatabaseAvailable()) {
-    return null;
-  }
-
-  const db = getDb();
-
-  try {
+  return withDbOrDefault(null, async (db) => {
     const [template] = await db
       .select()
       .from(exportTemplatesTable)
@@ -116,24 +76,8 @@ export async function getTemplate(
       ))
       .limit(1);
 
-    if (!template) {
-      return null;
-    }
-
-    return {
-      id: template.id,
-      userId: template.userId,
-      name: template.name,
-      format: template.format as 'csv' | 'json' | 'xml',
-      config: template.config,
-      isDefault: template.isDefault,
-      createdAt: template.createdAt,
-      updatedAt: template.updatedAt,
-    };
-  } catch (error) {
-    log.error('Failed to get template', { error, templateId, userId });
-    throw error;
-  }
+    return template ? mapToTemplate(template) : null;
+  });
 }
 
 /**
@@ -144,13 +88,9 @@ export async function updateTemplate(
   userId: string,
   updates: Partial<{ name: string; config: TemplateConfig; isDefault: boolean }>
 ): Promise<ExportTemplate> {
-  if (!isDatabaseAvailable()) {
-    throw new Error('Database not available');
-  }
+  const db = requireDb();
 
-  const db = getDb();
-
-  try {
+  return withErrorLogging(log, 'update template', { templateId, userId }, async () => {
     // If setting as default, unset other defaults for this format
     if (updates.isDefault) {
       const template = await getTemplate(templateId, userId);
@@ -180,20 +120,8 @@ export async function updateTemplate(
 
     log.info('Updated template', { templateId, userId });
 
-    return {
-      id: updated.id,
-      userId: updated.userId,
-      name: updated.name,
-      format: updated.format as 'csv' | 'json' | 'xml',
-      config: updated.config,
-      isDefault: updated.isDefault,
-      createdAt: updated.createdAt,
-      updatedAt: updated.updatedAt,
-    };
-  } catch (error) {
-    log.error('Failed to update template', { error, templateId, userId });
-    throw error;
-  }
+    return mapToTemplate(updated);
+  });
 }
 
 /**
@@ -203,13 +131,9 @@ export async function deleteTemplate(
   templateId: string,
   userId: string
 ): Promise<void> {
-  if (!isDatabaseAvailable()) {
-    throw new Error('Database not available');
-  }
+  const db = requireDb();
 
-  const db = getDb();
-
-  try {
+  return withErrorLogging(log, 'delete template', { templateId, userId }, async () => {
     await db
       .delete(exportTemplatesTable)
       .where(and(
@@ -218,10 +142,7 @@ export async function deleteTemplate(
       ));
 
     log.info('Deleted template', { templateId, userId });
-  } catch (error) {
-    log.error('Failed to delete template', { error, templateId, userId });
-    throw error;
-  }
+  });
 }
 
 /**
@@ -231,13 +152,7 @@ export async function getDefaultTemplate(
   userId: string,
   format: string
 ): Promise<ExportTemplate | null> {
-  if (!isDatabaseAvailable()) {
-    return null;
-  }
-
-  const db = getDb();
-
-  try {
+  return withDbOrDefault(null, async (db) => {
     const [template] = await db
       .select()
       .from(exportTemplatesTable)
@@ -248,24 +163,8 @@ export async function getDefaultTemplate(
       ))
       .limit(1);
 
-    if (!template) {
-      return null;
-    }
-
-    return {
-      id: template.id,
-      userId: template.userId,
-      name: template.name,
-      format: template.format as 'csv' | 'json' | 'xml',
-      config: template.config,
-      isDefault: template.isDefault,
-      createdAt: template.createdAt,
-      updatedAt: template.updatedAt,
-    };
-  } catch (error) {
-    log.error('Failed to get default template', { error, userId, format });
-    throw error;
-  }
+    return template ? mapToTemplate(template) : null;
+  });
 }
 
 /**
@@ -464,4 +363,29 @@ function sanitizeCSVCell(value: any): string {
     return `"${str.replace(/"/g, '""')}"`;
   }
   return str;
+}
+
+/**
+ * Map database row to ExportTemplate
+ */
+function mapToTemplate(row: {
+  id: string;
+  userId: string;
+  name: string;
+  format: string;
+  config: TemplateConfig;
+  isDefault: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}): ExportTemplate {
+  return {
+    id: row.id,
+    userId: row.userId,
+    name: row.name,
+    format: row.format as 'csv' | 'json' | 'xml',
+    config: row.config,
+    isDefault: row.isDefault,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
 }

@@ -14,6 +14,7 @@ import { validateFileContent, validatePdfFile, validatePageRanges } from "./midd
 import { isAbortError } from "./pdf-parser";
 import { optionalAuth, loadSubscription, requireAuth, requirePro } from "./middleware/auth";
 import { usageMiddleware } from "./middleware/usage";
+import { jsonError, jsonSuccess, jsonNotFound, jsonServerError } from "./utils/response-helpers";
 
 const log = createLogger("routes");
 
@@ -54,21 +55,12 @@ const upload = multer({
 function handleMulterError(err: Error, req: Request, res: Response, next: NextFunction) {
   if (err instanceof MulterError) {
     if (err.code === "LIMIT_FILE_SIZE") {
-      return res.status(400).json({
-        success: false,
-        message: "File is too large. Maximum size is 50MB.",
-      });
+      return jsonError(res, "File is too large. Maximum size is 50MB.");
     }
-    return res.status(400).json({
-      success: false,
-      message: err.message,
-    });
+    return jsonError(res, err.message);
   }
   if (err) {
-    return res.status(400).json({
-      success: false,
-      message: err.message,
-    });
+    return jsonError(res, err.message);
   }
   next();
 }
@@ -301,10 +293,7 @@ export async function registerRoutes(
   app.post("/api/v1/parse", fileParseLimiter, optionalAuth, loadSubscription, usageMiddleware, upload.single("file"), handleMulterError, async (req: Request, res: Response) => {
     try {
       if (!req.file) {
-        return res.status(400).json({
-          success: false,
-          message: "No file provided",
-        });
+        return jsonError(res, "No file provided");
       }
 
       const filename = req.file.originalname;
@@ -313,10 +302,7 @@ export async function registerRoutes(
       // Validate file content matches expected format
       const validation = validateFileContent(req.file.buffer, ext);
       if (!validation.valid) {
-        return res.status(400).json({
-          success: false,
-          message: validation.error,
-        });
+        return jsonError(res, validation.error!);
       }
 
       // Handle PDF files separately
@@ -346,10 +332,7 @@ export async function registerRoutes(
           }
 
           if (registers.length === 0) {
-            return res.status(400).json({
-              success: false,
-              message: "No Modbus registers found in the PDF. The document may not contain recognizable register tables.",
-            });
+            return jsonError(res, "No Modbus registers found in the PDF. The document may not contain recognizable register tables.");
           }
 
           await storage.createDocument({
@@ -372,10 +355,7 @@ export async function registerRoutes(
           return res.json(result);
         } catch (error) {
           const message = error instanceof Error ? error.message : "Failed to parse PDF";
-          return res.status(400).json({
-            success: false,
-            message,
-          });
+          return jsonError(res, message);
         }
       }
 
@@ -386,10 +366,7 @@ export async function registerRoutes(
       const registers = parseFile(content, format);
 
       if (registers.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: "No valid registers found in the file",
-        });
+        return jsonError(res, "No valid registers found in the file");
       }
 
       await storage.createDocument({
@@ -409,10 +386,7 @@ export async function registerRoutes(
       return res.json(result);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to parse file";
-      return res.status(400).json({
-        success: false,
-        message,
-      });
+      return jsonError(res, message);
     }
   });
 
@@ -425,7 +399,7 @@ export async function registerRoutes(
 
       // Sort by score descending and filter to relevant pages
       const sortedPages = [...metadata].sort((a, b) => b.score - a.score);
-      
+
       // Include pages with high score (>5) or medium score with tables (>2)
       const suggestedPages = sortedPages
         .filter(p => p.score > 5 || (p.hasTable && p.score > 2))
@@ -436,19 +410,11 @@ export async function registerRoutes(
           sectionTitle: p.sectionTitle,
         }));
 
-      return res.json({
-        success: true,
-        totalPages,
-        suggestedPages,
-        hints: hints.slice(0, 5), // Limit hints to top 5
-      });
+      return jsonSuccess(res, { totalPages, suggestedPages, hints: hints.slice(0, 5) });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to analyze PDF";
       log.error("PDF analysis failed", { error: message });
-      return res.status(400).json({
-        success: false,
-        message,
-      });
+      return jsonError(res, message);
     }
   });
 
@@ -477,12 +443,9 @@ export async function registerRoutes(
       }
 
       const documents = await storage.getAllDocuments(filter, { limit, offset });
-      return res.json({ success: true, documents });
+      return jsonSuccess(res, { documents });
     } catch (error) {
-      return res.status(500).json({
-        success: false,
-        message: "Failed to fetch documents",
-      });
+      return jsonServerError(res, "Failed to fetch documents");
     }
   });
 
@@ -492,17 +455,11 @@ export async function registerRoutes(
       const userId = req.user?.id;
       const document = await storage.getDocument(req.params.id, userId);
       if (!document) {
-        return res.status(404).json({
-          success: false,
-          message: "Document not found",
-        });
+        return jsonNotFound(res, "Document");
       }
-      return res.json({ success: true, document });
+      return jsonSuccess(res, { document });
     } catch (error) {
-      return res.status(500).json({
-        success: false,
-        message: "Failed to fetch document",
-      });
+      return jsonServerError(res, "Failed to fetch document");
     }
   });
 
@@ -512,17 +469,11 @@ export async function registerRoutes(
       const userId = req.user?.id;
       const deleted = await storage.deleteDocument(req.params.id, userId);
       if (!deleted) {
-        return res.status(404).json({
-          success: false,
-          message: "Document not found",
-        });
+        return jsonNotFound(res, "Document");
       }
-      return res.json({ success: true, message: "Document deleted" });
+      return jsonSuccess(res, { message: "Document deleted" });
     } catch (error) {
-      return res.status(500).json({
-        success: false,
-        message: "Failed to delete document",
-      });
+      return jsonServerError(res, "Failed to delete document");
     }
   });
 
@@ -532,19 +483,14 @@ export async function registerRoutes(
       const { folderId } = req.body;
 
       if (!storage.moveDocument) {
-        return res.status(501).json({
-          success: false,
-          message: "Document moving not supported",
-        });
+        return jsonError(res, "Document moving not supported", 501);
       }
 
       await storage.moveDocument(req.params.id, req.user!.id, folderId || null);
-      return res.json({ success: true, message: "Document moved" });
-    } catch (error: any) {
-      return res.status(400).json({
-        success: false,
-        message: error.message || "Failed to move document",
-      });
+      return jsonSuccess(res, { message: "Document moved" });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to move document";
+      return jsonError(res, message);
     }
   });
 
@@ -562,43 +508,23 @@ export async function registerRoutes(
   });
 
   // Legacy routes (backward compatibility) - redirect to v1
-  app.use("/api/parse*", (req, res, next) => {
+  // Helper to create legacy route redirect middleware
+  const createLegacyRedirect = (pattern: string) => (req: Request, res: Response, next: NextFunction) => {
     if (!req.path.startsWith("/api/v1/")) {
       const newPath = req.path.replace("/api/", "/api/v1/");
+      // Preserve query string for all redirects
+      const queryString = req.url.includes("?") ? req.url.substring(req.url.indexOf("?")) : "";
       log.warn("Legacy API endpoint used, redirecting", { oldPath: req.path, newPath });
-      res.redirect(307, newPath + (req.url.includes("?") ? req.url.substring(req.url.indexOf("?")) : ""));
+      res.redirect(307, newPath + queryString);
     } else {
       next();
     }
-  });
+  };
 
-  app.use("/api/documents*", (req, res, next) => {
-    if (!req.path.startsWith("/api/v1/")) {
-      const newPath = req.path.replace("/api/", "/api/v1/");
-      log.warn("Legacy API endpoint used, redirecting", { oldPath: req.path, newPath });
-      res.redirect(307, newPath);
-    } else {
-      next();
-    }
-  });
-
-  app.use("/api/analyze-pdf", (req, res, next) => {
-    if (!req.path.startsWith("/api/v1/")) {
-      const newPath = req.path.replace("/api/", "/api/v1/");
-      log.warn("Legacy API endpoint used, redirecting", { oldPath: req.path, newPath });
-      res.redirect(307, newPath);
-    } else {
-      next();
-    }
-  });
-
-  app.use("/api/health", (req, res, next) => {
-    if (!req.path.startsWith("/api/v1/")) {
-      res.redirect(307, "/api/v1/health");
-    } else {
-      next();
-    }
-  });
+  app.use("/api/parse*", createLegacyRedirect("/api/parse"));
+  app.use("/api/documents*", createLegacyRedirect("/api/documents"));
+  app.use("/api/analyze-pdf", createLegacyRedirect("/api/analyze-pdf"));
+  app.use("/api/health", createLegacyRedirect("/api/health"));
 
   return httpServer;
 }

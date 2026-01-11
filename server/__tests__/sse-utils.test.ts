@@ -66,7 +66,7 @@ describe("SSE Utils", () => {
       createSSEConnection(mockRes);
 
       expect(mockRes.headers["Content-Type"]).toBe("text/event-stream");
-      expect(mockRes.headers["Cache-Control"]).toBe("no-cache");
+      expect(mockRes.headers["Cache-Control"]).toBe("no-cache, no-transform");
       expect(mockRes.headers["Connection"]).toBe("keep-alive");
       expect(mockRes.flushHeaders).toHaveBeenCalled();
     });

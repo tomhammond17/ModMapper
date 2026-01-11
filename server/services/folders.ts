@@ -1,7 +1,7 @@
 import { and, eq, sql, isNull, asc } from 'drizzle-orm';
-import { getDb, isDatabaseAvailable } from '../db';
 import { foldersTable, documentsTable } from '../../shared/schema';
 import { createLogger } from '../logger';
+import { requireDb, withDbOrDefault, withErrorLogging } from '../utils/service-helpers';
 
 const log = createLogger('folders-service');
 
@@ -23,11 +23,7 @@ export async function createFolder(
   name: string,
   parentId?: string
 ): Promise<Folder> {
-  if (!isDatabaseAvailable()) {
-    throw new Error('Database not available');
-  }
-
-  const db = getDb();
+  const db = requireDb();
 
   let path = '/';
 
@@ -39,7 +35,7 @@ export async function createFolder(
     path = `${parent.path}${parent.id}/`;
   }
 
-  try {
+  return withErrorLogging(log, 'create folder', { userId, name }, async () => {
     const [folder] = await db
       .insert(foldersTable)
       .values({
@@ -52,51 +48,23 @@ export async function createFolder(
 
     log.info('Created folder', { userId, name, path });
 
-    return {
-      id: folder.id,
-      userId: folder.userId,
-      name: folder.name,
-      parentId: folder.parentId,
-      path: folder.path,
-      createdAt: folder.createdAt,
-      updatedAt: folder.updatedAt,
-    };
-  } catch (error) {
-    log.error('Failed to create folder', { error, userId, name });
-    throw error;
-  }
+    return mapToFolder(folder);
+  });
 }
 
 /**
  * Get all folders for user (flat list)
  */
 export async function getFolders(userId: string): Promise<Folder[]> {
-  if (!isDatabaseAvailable()) {
-    return [];
-  }
-
-  const db = getDb();
-
-  try {
+  return withDbOrDefault([], async (db) => {
     const folders = await db
       .select()
       .from(foldersTable)
       .where(eq(foldersTable.userId, userId))
       .orderBy(asc(foldersTable.path), asc(foldersTable.name));
 
-    return folders.map((f) => ({
-      id: f.id,
-      userId: f.userId,
-      name: f.name,
-      parentId: f.parentId,
-      path: f.path,
-      createdAt: f.createdAt,
-      updatedAt: f.updatedAt,
-    }));
-  } catch (error) {
-    log.error('Failed to get folders', { error, userId });
-    throw error;
-  }
+    return folders.map(mapToFolder);
+  });
 }
 
 /**
@@ -106,13 +74,7 @@ export async function getFolder(
   folderId: string,
   userId: string
 ): Promise<Folder | null> {
-  if (!isDatabaseAvailable()) {
-    return null;
-  }
-
-  const db = getDb();
-
-  try {
+  return withDbOrDefault(null, async (db) => {
     const [folder] = await db
       .select()
       .from(foldersTable)
@@ -122,23 +84,8 @@ export async function getFolder(
       ))
       .limit(1);
 
-    if (!folder) {
-      return null;
-    }
-
-    return {
-      id: folder.id,
-      userId: folder.userId,
-      name: folder.name,
-      parentId: folder.parentId,
-      path: folder.path,
-      createdAt: folder.createdAt,
-      updatedAt: folder.updatedAt,
-    };
-  } catch (error) {
-    log.error('Failed to get folder', { error, folderId, userId });
-    throw error;
-  }
+    return folder ? mapToFolder(folder) : null;
+  });
 }
 
 /**
@@ -149,11 +96,7 @@ export async function moveFolder(
   userId: string,
   newParentId?: string | null
 ): Promise<void> {
-  if (!isDatabaseAvailable()) {
-    throw new Error('Database not available');
-  }
-
-  const db = getDb();
+  const db = requireDb();
 
   const folder = await getFolder(folderId, userId);
   if (!folder) {
@@ -184,7 +127,7 @@ export async function moveFolder(
   const oldPath = `${folder.path}${folderId}/`;
   const newFullPath = `${newPath}${folderId}/`;
 
-  try {
+  return withErrorLogging(log, 'move folder', { folderId, userId }, async () => {
     // Update folder's path and parent
     await db
       .update(foldersTable)
@@ -213,10 +156,7 @@ export async function moveFolder(
     }
 
     log.info('Moved folder', { folderId, userId, newParentId });
-  } catch (error) {
-    log.error('Failed to move folder', { error, folderId, userId });
-    throw error;
-  }
+  });
 }
 
 /**
@@ -227,13 +167,9 @@ export async function renameFolder(
   userId: string,
   newName: string
 ): Promise<void> {
-  if (!isDatabaseAvailable()) {
-    throw new Error('Database not available');
-  }
+  const db = requireDb();
 
-  const db = getDb();
-
-  try {
+  return withErrorLogging(log, 'rename folder', { folderId, userId }, async () => {
     await db
       .update(foldersTable)
       .set({ name: newName, updatedAt: new Date() })
@@ -243,10 +179,7 @@ export async function renameFolder(
       ));
 
     log.info('Renamed folder', { folderId, userId, newName });
-  } catch (error) {
-    log.error('Failed to rename folder', { error, folderId, userId });
-    throw error;
-  }
+  });
 }
 
 /**
@@ -256,11 +189,7 @@ export async function deleteFolder(
   folderId: string,
   userId: string
 ): Promise<void> {
-  if (!isDatabaseAvailable()) {
-    throw new Error('Database not available');
-  }
-
-  const db = getDb();
+  const db = requireDb();
 
   const folder = await getFolder(folderId, userId);
   if (!folder) {
@@ -269,7 +198,7 @@ export async function deleteFolder(
 
   const folderPath = `${folder.path}${folderId}/`;
 
-  try {
+  return withErrorLogging(log, 'delete folder', { folderId, userId }, async () => {
     // Get all folder IDs to delete (this folder and all descendants)
     const foldersToDelete = await db
       .select({ id: foldersTable.id })
@@ -310,10 +239,7 @@ export async function deleteFolder(
       ));
 
     log.info('Deleted folder', { folderId, userId, deletedFolders: folderIds.length });
-  } catch (error) {
-    log.error('Failed to delete folder', { error, folderId, userId });
-    throw error;
-  }
+  });
 }
 
 /**
@@ -323,11 +249,7 @@ export async function getFolderPath(
   folderId: string,
   userId: string
 ): Promise<Folder[]> {
-  if (!isDatabaseAvailable()) {
-    throw new Error('Database not available');
-  }
-
-  const db = getDb();
+  requireDb();
 
   const folder = await getFolder(folderId, userId);
   if (!folder) {
@@ -343,7 +265,7 @@ export async function getFolderPath(
     return [folder];
   }
 
-  try {
+  return withErrorLogging(log, 'get folder path', { folderId, userId }, async () => {
     // Get all ancestor folders
     const ancestors: Folder[] = [];
     for (const id of pathIds) {
@@ -357,10 +279,7 @@ export async function getFolderPath(
     ancestors.sort((a, b) => a.path.length - b.path.length);
 
     return [...ancestors, folder];
-  } catch (error) {
-    log.error('Failed to get folder path', { error, folderId, userId });
-    throw error;
-  }
+  });
 }
 
 /**
@@ -370,13 +289,7 @@ export async function getChildFolders(
   userId: string,
   parentId?: string | null
 ): Promise<Folder[]> {
-  if (!isDatabaseAvailable()) {
-    return [];
-  }
-
-  const db = getDb();
-
-  try {
+  return withDbOrDefault([], async (db) => {
     let query;
     if (parentId === null || parentId === undefined) {
       // Get root level folders
@@ -402,17 +315,29 @@ export async function getChildFolders(
 
     const folders = await query;
 
-    return folders.map((f) => ({
-      id: f.id,
-      userId: f.userId,
-      name: f.name,
-      parentId: f.parentId,
-      path: f.path,
-      createdAt: f.createdAt,
-      updatedAt: f.updatedAt,
-    }));
-  } catch (error) {
-    log.error('Failed to get child folders', { error, userId, parentId });
-    throw error;
-  }
+    return folders.map(mapToFolder);
+  });
+}
+
+/**
+ * Map database row to Folder
+ */
+function mapToFolder(row: {
+  id: string;
+  userId: string;
+  name: string;
+  parentId: string | null;
+  path: string;
+  createdAt: Date;
+  updatedAt: Date;
+}): Folder {
+  return {
+    id: row.id,
+    userId: row.userId,
+    name: row.name,
+    parentId: row.parentId,
+    path: row.path,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
 }

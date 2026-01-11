@@ -69,6 +69,42 @@ interface BatchResult {
   registers: ModbusRegister[];
 }
 
+interface BatchError {
+  batch: number;
+  pages: string;
+  error: string;
+}
+
+interface BatchProcessingResult {
+  registers: ModbusRegister[];
+  results: BatchResult[];
+  errors: BatchError[];
+}
+
+interface BatchProgressCallback {
+  (batchNum: number, totalBatches: number, registersFound: number, pageRange: string, totalRegisters: number): void;
+}
+
+/**
+ * Format page numbers into a human-readable range string.
+ */
+function formatPageRange(pageNums: number[]): string {
+  return pageNums.length === 1
+    ? `${pageNums[0]}`
+    : `${pageNums[0]}-${pageNums[pageNums.length - 1]}`;
+}
+
+/**
+ * Create batches from pages array.
+ */
+function createBatches(pages: PageData[]): PageData[][] {
+  const batches: PageData[][] = [];
+  for (let i = 0; i < pages.length; i += PAGES_PER_BATCH) {
+    batches.push(pages.slice(i, i + PAGES_PER_BATCH));
+  }
+  return batches;
+}
+
 /**
  * Extract registers from a batch of pages.
  */
@@ -81,9 +117,7 @@ async function extractBatch(
   checkAborted(signal);
 
   const pageNums = pages.map(p => p.pageNum);
-  const pageRange = pageNums.length === 1
-    ? `${pageNums[0]}`
-    : `${pageNums[0]}-${pageNums[pageNums.length - 1]}`;
+  const pageRange = formatPageRange(pageNums);
 
   // Build context for this batch
   let context = "";
@@ -104,15 +138,83 @@ async function extractBatch(
   log.debug("Processing batch", { batch: batchNum, pages: pageRange, contextLength: context.length });
 
   const registers = await parseModbusRegistersFromContext(context, signal);
-  
+
   log.info("Batch complete", { batch: batchNum, pages: pageRange, registersFound: registers.length });
-  
+
   return {
     batchNum,
     pageRange,
     registersFound: registers.length,
     registers,
   };
+}
+
+/**
+ * Process batches in parallel with progress updates.
+ */
+async function processBatchesInParallel(
+  batches: PageData[][],
+  hints: DocumentHint[],
+  onProgress?: BatchProgressCallback,
+  signal?: AbortSignal
+): Promise<BatchProcessingResult> {
+  const allRegisters: ModbusRegister[] = [];
+  const batchResults: BatchResult[] = [];
+  const batchErrors: BatchError[] = [];
+
+  for (let i = 0; i < batches.length; i += PARALLEL_BATCHES) {
+    checkAborted(signal);
+
+    // Get chunk of batches to process in parallel
+    const batchChunk = batches.slice(i, i + PARALLEL_BATCHES);
+    const batchNumbers = batchChunk.map((_, idx) => i + idx + 1);
+
+    log.info("Processing batch chunk in parallel", {
+      batches: batchNumbers,
+      parallelCount: batchChunk.length,
+    });
+
+    // Process all batches in chunk simultaneously
+    const results = await Promise.allSettled(
+      batchChunk.map((batch, idx) => extractBatch(batch, batchNumbers[idx], hints, signal))
+    );
+
+    // Collect results and errors
+    for (let idx = 0; idx < results.length; idx++) {
+      const result = results[idx];
+      const batchNum = batchNumbers[idx];
+      const batch = batchChunk[idx];
+      const pageNums = batch.map(p => p.pageNum);
+      const pageRange = formatPageRange(pageNums);
+
+      if (result.status === "fulfilled") {
+        batchResults.push(result.value);
+        allRegisters.push(...result.value.registers);
+
+        // Send progress update
+        onProgress?.(batchNum, batches.length, result.value.registersFound, pageRange, allRegisters.length);
+      } else {
+        // Handle rejection
+        const error = result.reason;
+        if (isAbortError(error)) throw error;
+
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        log.error("Batch processing error", {
+          batch: batchNum,
+          pages: pageRange,
+          error: errorMessage,
+        });
+
+        batchErrors.push({
+          batch: batchNum,
+          pages: pageRange,
+          error: errorMessage,
+        });
+      }
+    }
+  }
+
+  return { registers: allRegisters, results: batchResults, errors: batchErrors };
 }
 
 /**
@@ -217,15 +319,8 @@ export async function parsePdfFile(
     });
 
     // PASS 3: Batch processing with LLM
-    const batches: PageData[][] = [];
-    for (let i = 0; i < pagesToProcess.length; i += PAGES_PER_BATCH) {
-      batches.push(pagesToProcess.slice(i, i + PAGES_PER_BATCH));
-    }
-
+    const batches = createBatches(pagesToProcess);
     const totalBatches = batches.length;
-    const allRegisters: ModbusRegister[] = [];
-    const batchResults: BatchResult[] = [];
-    const batchErrors: Array<{ batch: number; pages: string; error: string }> = [];
 
     onProgress?.({
       stage: "parsing",
@@ -239,71 +334,24 @@ export async function parsePdfFile(
     });
 
     // Process batches in parallel for faster extraction
-    for (let i = 0; i < batches.length; i += PARALLEL_BATCHES) {
-      checkAborted(signal);
-
-      // Get chunk of batches to process in parallel
-      const batchChunk = batches.slice(i, i + PARALLEL_BATCHES);
-      const batchNumbers = batchChunk.map((_, idx) => i + idx + 1);
-
-      log.info("Processing batch chunk in parallel", {
-        batches: batchNumbers,
-        parallelCount: batchChunk.length,
-      });
-
-      // Process all batches in chunk simultaneously
-      const results = await Promise.allSettled(
-        batchChunk.map((batch, idx) => extractBatch(batch, batchNumbers[idx], hints, signal))
-      );
-
-      // Collect results and errors
-      results.forEach((result, idx) => {
-        const batchNum = batchNumbers[idx];
-        const batch = batchChunk[idx];
-        const pageNums = batch.map(p => p.pageNum);
-        const pageRange = pageNums.length === 1
-          ? `${pageNums[0]}`
-          : `${pageNums[0]}-${pageNums[pageNums.length - 1]}`;
-
-        if (result.status === "fulfilled") {
-          batchResults.push(result.value);
-          allRegisters.push(...result.value.registers);
-
-          // Clear batch from memory after processing
-          batches[i + idx] = [];
-
-          // Send progress update
-          const progress = Math.round(((i + idx + 1) / batches.length) * 58) + 32;
-          onProgress?.({
-            stage: "analyzing",
-            progress,
-            message: `Batch ${batchNum}/${totalBatches}: Found ${result.value.registersFound} registers`,
-            details: `Pages ${pageRange} complete. Total: ${allRegisters.length} registers`,
-            totalBatches,
-            currentBatch: batchNum,
-            totalPages,
-            pagesProcessed: pagesAnalyzed,
-          });
-        } else {
-          // Handle rejection
-          const error = result.reason;
-          if (isAbortError(error)) throw error;
-
-          const errorMessage = error instanceof Error ? error.message : "Unknown error";
-          log.error("Batch processing error", {
-            batch: batchNum,
-            pages: pageRange,
-            error: errorMessage,
-          });
-
-          batchErrors.push({
-            batch: batchNum,
-            pages: pageRange,
-            error: errorMessage,
-          });
-        }
-      });
-    }
+    const { registers: allRegisters, results: batchResults, errors: batchErrors } = await processBatchesInParallel(
+      batches,
+      hints,
+      (batchNum, _totalBatches, registersFound, pageRange, totalRegisters) => {
+        const progress = Math.round((batchNum / totalBatches) * 58) + 32;
+        onProgress?.({
+          stage: "analyzing",
+          progress,
+          message: `Batch ${batchNum}/${totalBatches}: Found ${registersFound} registers`,
+          details: `Pages ${pageRange} complete. Total: ${totalRegisters} registers`,
+          totalBatches,
+          currentBatch: batchNum,
+          totalPages,
+          pagesProcessed: pagesAnalyzed,
+        });
+      },
+      signal
+    );
 
     // PASS 4: Merge and deduplicate
     onProgress?.({
@@ -479,15 +527,8 @@ export async function parsePdfWithPageHints(
     });
 
     // Process in batches
-    const batches: PageData[][] = [];
-    for (let i = 0; i < targetPages.length; i += PAGES_PER_BATCH) {
-      batches.push(targetPages.slice(i, i + PAGES_PER_BATCH));
-    }
-    
+    const batches = createBatches(targetPages);
     const totalBatches = batches.length;
-    const allRegisters: ModbusRegister[] = [];
-    const batchResults: BatchResult[] = [];
-    const batchErrors: Array<{ batch: number; pages: string; error: string }> = [];
 
     onProgress?.({
       stage: "parsing",
@@ -500,68 +541,24 @@ export async function parsePdfWithPageHints(
     });
 
     // Process batches in parallel for faster extraction
-    for (let i = 0; i < batches.length; i += PARALLEL_BATCHES) {
-      checkAborted(signal);
-
-      // Get chunk of batches to process in parallel
-      const batchChunk = batches.slice(i, i + PARALLEL_BATCHES);
-      const batchNumbers = batchChunk.map((_, idx) => i + idx + 1);
-
-      log.info("Processing batch chunk in parallel", {
-        batches: batchNumbers,
-        parallelCount: batchChunk.length,
-      });
-
-      // Process all batches in chunk simultaneously
-      const results = await Promise.allSettled(
-        batchChunk.map((batch, idx) => extractBatch(batch, batchNumbers[idx], hints, signal))
-      );
-
-      // Collect results and errors
-      results.forEach((result, idx) => {
-        const batchNum = batchNumbers[idx];
-        const batch = batchChunk[idx];
-        const pageNums = batch.map(p => p.pageNum);
-        const pageRange = pageNums.length === 1
-          ? `${pageNums[0]}`
-          : `${pageNums[0]}-${pageNums[pageNums.length - 1]}`;
-
-        if (result.status === "fulfilled") {
-          batchResults.push(result.value);
-          allRegisters.push(...result.value.registers);
-
-          // Send progress update
-          const progress = 20 + Math.round(((i + idx + 1) / batches.length) * 70);
-          onProgress?.({
-            stage: "analyzing",
-            progress,
-            message: `Batch ${batchNum}/${totalBatches}: Found ${result.value.registersFound} registers`,
-            details: `Pages ${pageRange} complete. Total: ${allRegisters.length} registers`,
-            totalBatches,
-            currentBatch: batchNum,
-            totalPages,
-            pagesProcessed: targetPages.length,
-          });
-        } else {
-          // Handle rejection
-          const error = result.reason;
-          if (isAbortError(error)) throw error;
-
-          const errorMessage = error instanceof Error ? error.message : "Unknown error";
-          log.error("Batch processing error", {
-            batch: batchNum,
-            pages: pageRange,
-            error: errorMessage,
-          });
-
-          batchErrors.push({
-            batch: batchNum,
-            pages: pageRange,
-            error: errorMessage,
-          });
-        }
-      });
-    }
+    const { registers: allRegisters, results: batchResults, errors: batchErrors } = await processBatchesInParallel(
+      batches,
+      hints,
+      (batchNum, _totalBatches, registersFound, pageRange, totalRegisters) => {
+        const progress = 20 + Math.round((batchNum / totalBatches) * 70);
+        onProgress?.({
+          stage: "analyzing",
+          progress,
+          message: `Batch ${batchNum}/${totalBatches}: Found ${registersFound} registers`,
+          details: `Pages ${pageRange} complete. Total: ${totalRegisters} registers`,
+          totalBatches,
+          currentBatch: batchNum,
+          totalPages,
+          pagesProcessed: targetPages.length,
+        });
+      },
+      signal
+    );
 
     // Merge and deduplicate new registers
     const newRegisters = mergeAndDeduplicateRegisters(allRegisters);
