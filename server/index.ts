@@ -15,6 +15,7 @@ import { registerAuthRoutes } from "./routes/auth";
 import { registerBillingRoutes, handleStripeWebhook } from "./routes/billing";
 import { registerFolderRoutes } from "./routes/folders";
 import { registerVersionRoutes } from "./routes/versions";
+import { registerTemplateRoutes } from "./routes/templates";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { logger, logRequest, createLogger } from "./logger";
@@ -187,6 +188,9 @@ app.use(express.urlencoded({ extended: false }));
 
   // Register version routes (Pro-only version control)
   registerVersionRoutes(app);
+
+  // Register template routes (Pro-only custom export templates)
+  registerTemplateRoutes(app);
 
   // Register remaining routes (after compression so they get compressed)
   await registerRoutes(httpServer, app);
