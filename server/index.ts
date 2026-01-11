@@ -58,18 +58,23 @@ app.use(helmet({
 }));
 
 // CORS configuration - control which origins can access the API
+// In development, allow all origins for easy testing on Replit
 const allowedOrigins = env.ALLOWED_ORIGINS
   ? env.ALLOWED_ORIGINS.split(",").map(o => o.trim())
-  : env.NODE_ENV === "production"
-    ? [] // No origins allowed by default in production (must set ALLOWED_ORIGINS)
-    : ["http://localhost:5000", "http://localhost:5173"]; // Vite dev server
+  : [];
 
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps, Postman, curl)
     if (!origin) return callback(null, true);
 
-    if (allowedOrigins.length === 0 && env.NODE_ENV === "production") {
+    // In development, allow all origins (Replit uses dynamic URLs)
+    if (env.NODE_ENV !== "production") {
+      return callback(null, true);
+    }
+
+    // In production, require explicit ALLOWED_ORIGINS configuration
+    if (allowedOrigins.length === 0) {
       log.warn("CORS: No allowed origins configured in production", { origin });
       return callback(new Error("Not allowed by CORS - configure ALLOWED_ORIGINS"));
     }
@@ -82,7 +87,7 @@ app.use(cors({
     }
   },
   credentials: true,
-  methods: ["GET", "POST", "DELETE", "OPTIONS"],
+  methods: ["GET", "POST", "DELETE", "OPTIONS", "PATCH", "PUT"],
   allowedHeaders: ["Content-Type", "Accept"],
 }));
 

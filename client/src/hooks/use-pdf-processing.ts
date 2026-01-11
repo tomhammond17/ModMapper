@@ -1,5 +1,6 @@
 import { useReducer, useCallback, useRef } from "react";
 import { parseSSEStream, type SSEProgressData } from "@/lib/sse-parser";
+import { apiEndpoints } from "@/lib/api";
 import type { ConversionResult, ModbusRegister } from "@shared/schema";
 
 export type ConversionStep = "upload" | "pageIdentify" | "converting" | "preview";
@@ -57,6 +58,11 @@ function processingReducer(state: ProcessingState, action: ProcessingAction): Pr
         statusMessage: action.message || "Processing...",
         isProcessing: true,
         startTime: Date.now(),
+        stage: "uploading",
+        totalBatches: 0,
+        currentBatch: 0,
+        totalPages: 0,
+        pagesProcessed: 0,
       };
     case "UPDATE_PROGRESS":
       return {
@@ -132,8 +138,8 @@ export function usePdfProcessing(): UsePdfProcessingResult {
         formData.append("file", file);
 
         const endpoint = pageRanges
-          ? "/api/parse-pdf-with-hints"
-          : "/api/parse-pdf-stream";
+          ? apiEndpoints.parsePdfWithHints
+          : apiEndpoints.parsePdfStream;
 
         if (pageRanges) {
           formData.append("pageRanges", pageRanges);
