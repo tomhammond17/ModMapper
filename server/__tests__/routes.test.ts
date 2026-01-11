@@ -268,7 +268,7 @@ Temperature,UINT16,Current temperature,false`;
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.documents).toBeInstanceOf(Array);
+      expect(response.body.data.documents).toBeInstanceOf(Array);
     });
   });
 
@@ -278,8 +278,8 @@ Temperature,UINT16,Current temperature,false`;
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.document).toBeDefined();
-      expect(response.body.document.id).toBe("existing-id");
+      expect(response.body.data.document).toBeDefined();
+      expect(response.body.data.document.id).toBe("existing-id");
     });
 
     it("should return 404 for non-existent document", async () => {
@@ -297,7 +297,7 @@ Temperature,UINT16,Current temperature,false`;
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.message).toBe("Document deleted");
+      expect(response.body.data.message).toBe("Document deleted");
     });
 
     it("should return 404 when deleting non-existent document", async () => {
